@@ -12,7 +12,39 @@ import { SettingsDialog } from "@/components/settings-dialog";
 import { FEATURES } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 
-const USER = { name: "Chatbot", email: "demo@example.com" };
+type CurrentUser = { name: string; department: string; username: string };
+
+const initials = (name: string) =>
+  name
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+async function logout() {
+  try {
+    await fetch("/api/auth/logout", { method: "POST" });
+  } finally {
+    window.location.assign("/login");
+  }
+}
+
+// Who is logged in (from the signed login cookie, via /api/auth/me).
+function useCurrentUser() {
+  const [user, setUser] = useState<CurrentUser | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/auth/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => alive && d?.user && setUser(d.user))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return user;
+}
 
 const ITEMS = [
   { label: "Settings", icon: SettingsIcon, onSelect: "settings" },
@@ -23,6 +55,7 @@ const ITEMS = [
 export const UserMenu: FC = () => {
   const [open, setOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const user = useCurrentUser();
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -41,15 +74,31 @@ export const UserMenu: FC = () => {
     };
   }, [open]);
 
-  // Until login exists the menu items do nothing, so show a plain user chip.
+  // Settings / Language / Help do nothing yet, so show a simple chip with Log out.
   if (!FEATURES.userMenu) {
     return (
       <div className="border-t p-2">
-        <div className="flex h-11 items-center gap-3 px-2 text-sm">
-          <span className="bg-muted flex size-7 items-center justify-center rounded-full text-xs font-medium">
-            PE
+        <div className="flex h-12 items-center gap-3 px-2 text-sm">
+          <span className="bg-muted flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-medium">
+            {user ? initials(user.name) : ""}
           </span>
-          <span className="flex-1 truncate">PLPA Employee</span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-medium">
+              {user?.name ?? ""}
+            </span>
+            <span className="text-muted-foreground block truncate text-xs">
+              {user?.department ?? ""}
+            </span>
+          </span>
+          <button
+            type="button"
+            title="Log out"
+            aria-label="Log out"
+            onClick={logout}
+            className="hover:bg-muted text-muted-foreground hover:text-foreground flex size-8 shrink-0 items-center justify-center rounded-md"
+          >
+            <LogOutIcon className="size-4" />
+          </button>
         </div>
       </div>
     );
@@ -67,7 +116,7 @@ export const UserMenu: FC = () => {
           className="bg-popover absolute inset-x-2 bottom-full mb-2 rounded-xl border p-1.5 shadow-lg"
         >
           <div className="text-muted-foreground px-3 py-2 text-xs">
-            {USER.email}
+            {user?.username}
           </div>
           <div className="my-1 border-t" />
           {ITEMS.map(({ label, icon: Icon, onSelect }) => (
@@ -89,7 +138,7 @@ export const UserMenu: FC = () => {
           <button
             type="button"
             role="menuitem"
-            onClick={() => setOpen(false)}
+            onClick={logout}
             className={itemClass}
           >
             <LogOutIcon className="size-4" />
@@ -108,12 +157,9 @@ export const UserMenu: FC = () => {
         )}
       >
         <span className="bg-muted flex size-7 items-center justify-center rounded-full text-xs font-medium">
-          {USER.name
-            .split(" ")
-            .map((w) => w[0])
-            .join("")}
+          {user ? initials(user.name) : ""}
         </span>
-        <span className="flex-1 truncate text-start">{USER.name}</span>
+        <span className="flex-1 truncate text-start">{user?.name}</span>
         <ChevronDownIcon className="text-muted-foreground size-4" />
       </button>
     </div>

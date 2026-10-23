@@ -7,6 +7,8 @@ import {
   type UIMessage,
 } from "ai";
 
+import { getSessionUser } from "@/lib/auth";
+
 export const maxDuration = 60;
 
 // Local model server (Ollama in dev/POC, vLLM in production). Both speak the
@@ -94,6 +96,10 @@ function demoResponse() {
 }
 
 export async function POST(req: Request) {
+  if (!(await getSessionUser())) {
+    return Response.json({ error: "Please sign in." }, { status: 401 });
+  }
+
   const {
     messages,
     instructions,
