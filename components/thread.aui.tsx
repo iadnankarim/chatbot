@@ -450,7 +450,7 @@ const AiDisclaimer: FC = () => (
 const ThreadWelcome: FC = () => {
   return (
     <div className="aui-thread-welcome-root fade-in slide-in-from-bottom-1 animate-in fill-mode-both mb-8 flex flex-col items-center gap-3 px-2 text-center duration-200">
-      <BrandMark className="size-12 rounded-xl text-2xl" />
+      <BrandMark className="size-20" />
       <p className="text-lg font-semibold">{BRAND.name}</p>
       <p className="text-muted-foreground -mt-1 text-sm" dir="rtl">
         {BRAND.nameUr}

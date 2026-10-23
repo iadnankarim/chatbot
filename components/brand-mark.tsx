@@ -1,15 +1,15 @@
+import Image from "next/image";
 import type { FC } from "react";
 import { cn } from "@/lib/utils";
 
-// Text-based placeholder logo until the official PLPA logo is available.
+// Official PLPA seal (public/logo.png). logo-256.png is a small copy for the UI.
 export const BrandMark: FC<{ className?: string }> = ({ className }) => (
-  <span
-    aria-hidden
-    className={cn(
-      "bg-primary text-primary-foreground inline-flex size-7 shrink-0 items-center justify-center rounded-lg text-sm font-bold",
-      className,
-    )}
-  >
-    P
-  </span>
+  <Image
+    src="/logo-256.png"
+    alt="Pakistan Land Port Authority"
+    width={256}
+    height={256}
+    priority
+    className={cn("size-7 shrink-0 rounded-full object-cover", className)}
+  />
 );
