@@ -1,17 +1,30 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { themeInitScript } from "@/lib/theme-script";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-const geistSans = Geist({
+// Fonts are bundled locally (app/fonts) so the app works fully offline.
+const geistSans = localFont({
+  src: "./fonts/geist-latin.woff2",
   variable: "--font-geist-sans",
-  subsets: ["latin"],
+  weight: "100 900",
+  // The auto-generated Arial fallback has Arabic glyphs and would swallow Urdu text
+  // before it reaches the Urdu font.
+  adjustFontFallback: false,
 });
 
-const geistMono = Geist_Mono({
+const geistMono = localFont({
+  src: "./fonts/geist-mono-latin.woff2",
   variable: "--font-geist-mono",
-  subsets: ["latin"],
+  weight: "100 900",
+});
+
+// Urdu glyphs. Latin text falls through to Geist, Urdu text to this font.
+const nastaliqUrdu = localFont({
+  src: "./fonts/noto-nastaliq-urdu-arabic.woff2",
+  variable: "--font-nastaliq-urdu",
+  weight: "400 700",
 });
 
 export const metadata: Metadata = {
@@ -24,7 +37,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${nastaliqUrdu.variable} h-full antialiased`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
