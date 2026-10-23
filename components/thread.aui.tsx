@@ -1,7 +1,7 @@
 "use client";
 
 import { BrandMark } from "@/components/brand-mark";
-import { BRAND, DISCLAIMER, WELCOME } from "@/lib/brand";
+import { BRAND, DISCLAIMER, FEATURES, WELCOME } from "@/lib/brand";
 import {
   ComposerAddAttachment,
   ComposerAttachments,
@@ -441,9 +441,11 @@ const AiDisclaimer: FC = () => (
     className="aui-ai-disclaimer text-muted-foreground -mt-1 flex flex-col items-center text-center text-xs"
   >
     <span className="leading-5">{DISCLAIMER.en}</span>
-    <span dir="rtl" className="text-sm leading-9">
-      {DISCLAIMER.ur}
-    </span>
+    {FEATURES.urduInterface && (
+      <span dir="rtl" className="text-sm leading-9">
+        {DISCLAIMER.ur}
+      </span>
+    )}
   </div>
 );
 
@@ -452,15 +454,19 @@ const ThreadWelcome: FC = () => {
     <div className="aui-thread-welcome-root fade-in slide-in-from-bottom-1 animate-in fill-mode-both mb-8 flex flex-col items-center gap-3 px-2 text-center duration-200">
       <BrandMark className="size-20" />
       <p className="text-lg font-semibold">{BRAND.name}</p>
-      <p className="text-muted-foreground -mt-1 text-sm" dir="rtl">
-        {BRAND.nameUr}
-      </p>
+      {FEATURES.urduInterface && (
+        <p className="text-muted-foreground -mt-1 text-sm" dir="rtl">
+          {BRAND.nameUr}
+        </p>
+      )}
       <p className="aui-thread-welcome-message-inner mt-3 text-2xl font-medium tracking-tight">
         {WELCOME.en}
       </p>
-      <p className="text-muted-foreground text-xl" dir="rtl">
-        {WELCOME.ur}
-      </p>
+      {FEATURES.urduInterface && (
+        <p className="text-muted-foreground text-xl" dir="rtl">
+          {WELCOME.ur}
+        </p>
+      )}
     </div>
   );
 };

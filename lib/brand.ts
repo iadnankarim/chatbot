@@ -19,6 +19,9 @@ export const DISCLAIMER = {
 
 // Screens that exist in the UI but are not ready for the demo.
 export const FEATURES = {
+  // Urdu text in the fixed UI (name, greeting, suggestions, disclaimer).
+  // Chat answers in Urdu still work either way.
+  urduInterface: false,
   // Projects are not part of the PLPA requirements.
   projects: false,
   // Settings / Language / Help / Log out do nothing yet. Turn on with login.
@@ -27,11 +30,19 @@ export const FEATURES = {
 
 // General-purpose prompts that work without documents. Document questions
 // (fees, leave policy, ...) are added once the Knowledge Base mode exists.
-export const SUGGESTIONS = [
+const SUGGESTIONS_EN = [
   "Draft a polite email asking my manager for two days of leave",
   "Give me 5 tips for running an effective meeting",
   "Explain the difference between a memo and an office order",
+  "Write a short thank-you note to a colleague",
+];
+
+const SUGGESTIONS_UR = [
   "چھٹی کی درخواست کا ایک رسمی خط لکھیں",
   "دفتر میں وقت کی پابندی کیوں ضروری ہے؟",
   "ایک اچھی میٹنگ کے لیے پانچ مفید نکات بتائیں",
 ];
+
+export const SUGGESTIONS = FEATURES.urduInterface
+  ? [...SUGGESTIONS_EN, ...SUGGESTIONS_UR]
+  : SUGGESTIONS_EN;
