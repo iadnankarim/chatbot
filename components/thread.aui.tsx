@@ -1,6 +1,8 @@
 "use client";
 
 import { BrandMark } from "@/components/brand-mark";
+import { useKbMode } from "@/components/kb-mode";
+import { BookOpenIcon } from "lucide-react";
 import { BRAND, DISCLAIMER, FEATURES, WELCOME } from "@/lib/brand";
 import {
   ComposerAddAttachment,
@@ -450,6 +452,7 @@ const AiDisclaimer: FC = () => (
 );
 
 const ThreadWelcome: FC = () => {
+  const { kbOn } = useKbMode();
   return (
     <div className="aui-thread-welcome-root fade-in slide-in-from-bottom-1 animate-in fill-mode-both mb-8 flex flex-col items-center gap-3 px-2 text-center duration-200">
       <BrandMark className="size-20" />
@@ -465,6 +468,11 @@ const ThreadWelcome: FC = () => {
       {FEATURES.urduInterface && (
         <p className="text-muted-foreground text-xl" dir="rtl">
           {WELCOME.ur}
+        </p>
+      )}
+      {kbOn && (
+        <p className="bg-primary/10 text-primary rounded-full px-3 py-1 text-xs font-medium dark:text-foreground">
+          Knowledge Base mode: answers come only from PLPA documents
         </p>
       )}
     </div>
@@ -501,11 +509,33 @@ const ThreadSuggestionItem: FC = () => {
 // Sending an attachment to the local model fails, so the UI is switched off until then.
 const ATTACHMENTS_ENABLED = false;
 
+const KbToggle: FC = () => {
+  const { kbOn, toggle } = useKbMode();
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-pressed={kbOn}
+      title="Knowledge Base: answer only from PLPA documents and show the source"
+      className={cn(
+        "flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors",
+        kbOn
+          ? "border-primary bg-primary text-primary-foreground"
+          : "border-foreground/15 text-muted-foreground hover:bg-muted hover:text-foreground",
+      )}
+    >
+      <BookOpenIcon className="size-3.5" />
+      Knowledge Base
+    </button>
+  );
+};
+
 const Composer: FC<{ autoFocus: boolean }> = ({ autoFocus }) => {
+  const { kbOn } = useKbMode();
   return (
     <ComposerPrimitive.Root className="aui-composer-root relative flex w-full flex-col">
       <ComposerPrimitive.AttachmentDropzone disabled={!ATTACHMENTS_ENABLED} render={<div data-slot="aui_composer-shell" className="border-foreground/10 focus-within:border-foreground/25 data-[dragging=true]:border-ring flex w-full cursor-text flex-col gap-2 rounded-(--composer-radius) border bg-(--composer-bg) p-(--composer-padding) transition-[border-color] data-[dragging=true]:border-dashed data-[dragging=true]:bg-[color-mix(in_oklab,var(--color-accent)_50%,var(--color-background))]" />}><ComposerAttachments /><ComposerPrimitive.Input
-                      placeholder="Send a message..." dir="auto"
+                      placeholder={kbOn ? "Ask about PLPA documents..." : "Send a message..."} dir="auto"
                       className="aui-composer-input caret-primary placeholder:text-muted-foreground/60 max-h-48 min-h-10 w-full resize-none bg-transparent px-2.5 py-1 text-base leading-6 outline-none"
                       rows={1}
                       autoFocus={autoFocus}
@@ -526,7 +556,10 @@ const ComposerAction: FC = () => {
 
   return (
     <div className="aui-composer-action-wrapper relative flex items-center justify-between">
-      {ATTACHMENTS_ENABLED ? <ComposerAddAttachment /> : <span />}
+      <div className="flex items-center gap-1.5">
+        {ATTACHMENTS_ENABLED && <ComposerAddAttachment />}
+        <KbToggle />
+      </div>
       <div className="flex items-center gap-1.5">
         <AuiIf condition={(s) => s.thread.capabilities.dictation}>
           <AuiIf condition={(s) => s.composer.dictation == null}>

@@ -28,8 +28,16 @@ export const FEATURES = {
   userMenu: false,
 };
 
-// General-purpose prompts that work without documents. Document questions
-// (fees, leave policy, ...) are added once the Knowledge Base mode exists.
+// Shown in Knowledge Base mode. These match the SAMPLE documents (sample-docs/);
+// replace them with questions about the real PLPA documents.
+export const KB_SUGGESTIONS = [
+  "What is the fee for a new CNIC under urgent service?",
+  "How many days of annual leave does an employee get?",
+  "What are the office timings on Saturday?",
+  "How long does a complaint's Level 1 resolution take?",
+];
+
+// General-purpose prompts that work without documents.
 const SUGGESTIONS_EN = [
   "Draft a polite email asking my manager for two days of leave",
   "Give me 5 tips for running an effective meeting",

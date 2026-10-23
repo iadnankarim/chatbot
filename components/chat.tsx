@@ -24,7 +24,8 @@ import { Thread } from "@/components/thread.aui";
 import { ThreadList } from "@/components/thread-list.aui";
 import { UserMenu } from "@/components/user-menu";
 import { BrandMark } from "@/components/brand-mark";
-import { BRAND, FEATURES, SUGGESTIONS } from "@/lib/brand";
+import { KbModeProvider, useKbMode } from "@/components/kb-mode";
+import { BRAND, FEATURES, KB_SUGGESTIONS, SUGGESTIONS } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 
 // Keeps new chats attached to the project they were started from, and feeds
@@ -57,7 +58,10 @@ function ProjectThreadSync() {
 }
 
 function ChatLayout() {
-  const aui = useAui({ suggestions: Suggestions(SUGGESTIONS) });
+  const { kbOn } = useKbMode();
+  const aui = useAui({
+    suggestions: Suggestions(kbOn ? KB_SUGGESTIONS : SUGGESTIONS),
+  });
   const { view, setView, setActiveProjectId, setCreateOpen } = useProjects();
   const [collapsed, setCollapsed] = useState(false);
 
@@ -148,10 +152,11 @@ function ChatLayout() {
 
 function ChatRuntime() {
   const { instructionsRef } = useProjects();
+  const { kbRef } = useKbMode();
   const runtime = useChatRuntime({
     transport: new AssistantChatTransport({
       api: "/api/chat",
-      body: () => ({ instructions: instructionsRef.current }),
+      body: () => ({ instructions: instructionsRef.current, kb: kbRef.current }),
     }),
   });
 
@@ -164,8 +169,10 @@ function ChatRuntime() {
 
 export function Chat() {
   return (
-    <ProjectsProvider>
-      <ChatRuntime />
-    </ProjectsProvider>
+    <KbModeProvider>
+      <ProjectsProvider>
+        <ChatRuntime />
+      </ProjectsProvider>
+    </KbModeProvider>
   );
 }

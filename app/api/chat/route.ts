@@ -8,6 +8,7 @@ import {
 } from "ai";
 
 import { getSessionUser } from "@/lib/auth";
+import { kbResponse } from "@/lib/kb/answer";
 
 export const maxDuration = 60;
 
@@ -96,17 +97,30 @@ function demoResponse() {
 }
 
 export async function POST(req: Request) {
-  if (!(await getSessionUser())) {
+  const user = await getSessionUser();
+  if (!user) {
     return Response.json({ error: "Please sign in." }, { status: 401 });
   }
 
   const {
     messages,
     instructions,
-  }: { messages: UIMessage[]; instructions?: string } = await req.json();
+    kb,
+  }: { messages: UIMessage[]; instructions?: string; kb?: boolean } =
+    await req.json();
 
   if (lastUserText(messages) === "demo") {
     return demoResponse();
+  }
+
+  // Knowledge Base mode: answers only from PLPA documents, with sources.
+  if (kb) {
+    return kbResponse({
+      messages,
+      user,
+      model: llm(MODEL),
+      errorMessage: ERROR_MESSAGE,
+    });
   }
 
   const result = streamText({
