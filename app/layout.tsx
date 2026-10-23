@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { themeInitScript } from "@/lib/theme-script";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { BRAND } from "@/lib/brand";
 
 // Fonts are bundled locally (app/fonts) so the app works fully offline.
 const geistSans = localFont({
@@ -28,8 +29,8 @@ const nastaliqUrdu = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "AI Chatbot",
-  description: "AI chatbot built with assistant-ui",
+  title: BRAND.name,
+  description: BRAND.description,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

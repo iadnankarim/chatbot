@@ -1,5 +1,7 @@
 "use client";
 
+import { BrandMark } from "@/components/brand-mark";
+import { BRAND, DISCLAIMER, WELCOME } from "@/lib/brand";
 import {
   ComposerAddAttachment,
   ComposerAttachments,
@@ -251,6 +253,7 @@ const ThreadRoot: FC<{ isEmpty: boolean; autoFocus: boolean }> = ({
             <AuiIf condition={(s) => isNewChatView(s) && s.composer.isEmpty}>
               <ThreadSuggestions />
             </AuiIf>
+            <AiDisclaimer />
           </ThreadPrimitive.ViewportFooter>
         </div>
       </ThreadPrimitive.Viewport>
@@ -432,11 +435,31 @@ const ThreadScrollToBottom: FC = () => {
   );
 };
 
+const AiDisclaimer: FC = () => (
+  <div
+    role="note"
+    className="aui-ai-disclaimer text-muted-foreground -mt-1 flex flex-col items-center text-center text-xs"
+  >
+    <span className="leading-5">{DISCLAIMER.en}</span>
+    <span dir="rtl" className="text-sm leading-9">
+      {DISCLAIMER.ur}
+    </span>
+  </div>
+);
+
 const ThreadWelcome: FC = () => {
   return (
-    <div className="aui-thread-welcome-root mb-6 flex flex-col px-2">
-      <p className="aui-thread-welcome-message-inner fade-in slide-in-from-bottom-1 animate-in fill-mode-both text-2xl font-medium tracking-tight duration-200">
-        How can I help you today?
+    <div className="aui-thread-welcome-root fade-in slide-in-from-bottom-1 animate-in fill-mode-both mb-8 flex flex-col items-center gap-3 px-2 text-center duration-200">
+      <BrandMark className="size-12 rounded-xl text-2xl" />
+      <p className="text-lg font-semibold">{BRAND.name}</p>
+      <p className="text-muted-foreground -mt-1 text-sm" dir="rtl">
+        {BRAND.nameUr}
+      </p>
+      <p className="aui-thread-welcome-message-inner mt-3 text-2xl font-medium tracking-tight">
+        {WELCOME.en}
+      </p>
+      <p className="text-muted-foreground text-xl" dir="rtl">
+        {WELCOME.ur}
       </p>
     </div>
   );
@@ -455,7 +478,7 @@ const ThreadSuggestions: FC = () => {
 const ThreadSuggestionItem: FC = () => {
   return (
     <div className="aui-thread-welcome-suggestion-display fade-in slide-in-from-bottom-2 animate-in fill-mode-both duration-200">
-      <SuggestionPrimitive.Trigger send render={<button type="button" className="aui-thread-welcome-suggestion group hover:bg-foreground/[0.03] focus-visible:ring-ring/50 flex w-full items-baseline gap-2.5 rounded-md px-2 py-2 text-start text-sm transition-colors outline-none focus-visible:ring-1 motion-reduce:transition-none" />}><span
+      <SuggestionPrimitive.Trigger send render={<button type="button" dir="auto" className="aui-thread-welcome-suggestion group hover:bg-foreground/[0.03] focus-visible:ring-ring/50 flex w-full items-baseline gap-2.5 rounded-md px-2 py-2 text-start text-sm transition-colors outline-none focus-visible:ring-1 motion-reduce:transition-none" />}><span
                       aria-hidden
                       className="text-muted-foreground/60 group-hover:text-foreground font-mono text-xs transition-colors motion-reduce:transition-none"
                     >

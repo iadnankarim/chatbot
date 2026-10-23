@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState, type FC } from "react";
 import { SettingsDialog } from "@/components/settings-dialog";
+import { FEATURES } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 
 const USER = { name: "Chatbot", email: "demo@example.com" };
@@ -39,6 +40,20 @@ export const UserMenu: FC = () => {
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [open]);
+
+  // Until login exists the menu items do nothing, so show a plain user chip.
+  if (!FEATURES.userMenu) {
+    return (
+      <div className="border-t p-2">
+        <div className="flex h-11 items-center gap-3 px-2 text-sm">
+          <span className="bg-muted flex size-7 items-center justify-center rounded-full text-xs font-medium">
+            PE
+          </span>
+          <span className="flex-1 truncate">PLPA Employee</span>
+        </div>
+      </div>
+    );
+  }
 
   const itemClass =
     "hover:bg-muted flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm";

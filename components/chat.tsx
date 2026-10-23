@@ -23,14 +23,9 @@ import { ProjectsList } from "@/components/projects-view";
 import { Thread } from "@/components/thread.aui";
 import { ThreadList } from "@/components/thread-list.aui";
 import { UserMenu } from "@/components/user-menu";
+import { BrandMark } from "@/components/brand-mark";
+import { BRAND, FEATURES, SUGGESTIONS } from "@/lib/brand";
 import { cn } from "@/lib/utils";
-
-const SUGGESTIONS = [
-  "Show a sales dashboard",
-  "Plan a road trip",
-  "Plan a dinner party",
-  "Explain how streaming chat works",
-];
 
 // Keeps new chats attached to the project they were started from, and feeds
 // that project's instructions into the next request.
@@ -93,12 +88,14 @@ function ChatLayout() {
             >
               <PanelLeftIcon className="size-4" />
             </button>
-            AI Chatbot
+            <BrandMark />
+            <span className="truncate">{BRAND.name}</span>
           </div>
           <div className="flex-1 overflow-y-auto px-2 pt-1 pb-2">
             <ThreadList
               onNavigate={showChat}
               extraItems={
+                FEATURES.projects ? (
                 <div
                   className={cn(
                     "group hover:bg-muted flex h-8 items-center rounded-md pe-1",
@@ -123,6 +120,7 @@ function ChatLayout() {
                     <PlusIcon className="size-4" />
                   </button>
                 </div>
+                ) : undefined
               }
             />
           </div>
