@@ -3,6 +3,7 @@
 import {
   createUIMessageStream,
   createUIMessageStreamResponse,
+  generateText,
   streamText,
   type LanguageModel,
   type UIMessage,
@@ -16,6 +17,9 @@ import { search, type Hit } from "@/lib/kb/store";
 // scored 0.48 - 0.72, unrelated ones 0.27 - 0.36 (near-topic ones such as "passport fee"
 // reach 0.56, those are left to the model's "not found" rule).
 const MIN_SCORE = Number(process.env.KB_MIN_SCORE ?? 0.45);
+// A very clear match (0.66+) is answered straight away. Weaker matches get a yes/no check
+// first. On the sample documents related-but-unanswerable questions scored at most 0.64.
+const VERIFY_BELOW = Number(process.env.KB_VERIFY_BELOW ?? 0.66);
 const MAX_CHUNKS = 3;
 const SCORE_WINDOW = 0.08; // only use chunks close to the best match
 
@@ -109,8 +113,12 @@ function sourcesBlock(hits: Hit[], urdu: boolean) {
   return `\n\n---\n**${urdu ? "ماخذ" : "Sources"}:**\n${lines.join("\n")}`;
 }
 
+const contextBlock = (hits: Hit[]) =>
+  "CONTEXT:\n" + hits.map((h, i) => `[${i + 1}] ${h.text}`).join("\n\n");
+
+// Instructions first, context last: with the context first the model answered "not found"
+// to clear questions in testing.
 function systemPrompt(hits: Hit[], urdu: boolean) {
-  const context = hits.map((h, i) => `[${i + 1}] ${h.text}`).join("\n\n");
   return [
     "You are the PLPA document assistant. Answer ONLY from the CONTEXT below.",
     `If the answer is not in the CONTEXT, reply exactly: ${urdu ? NOT_FOUND.ur : NOT_FOUND.en}`,
@@ -121,8 +129,37 @@ function systemPrompt(hits: Hit[], urdu: boolean) {
     urdu
       ? "Answer in Urdu, using only Urdu script and simple formal Urdu."
       : "Answer in English.",
-    `\nCONTEXT:\n${context}`,
+    `\n${contextBlock(hits)}`,
   ].join(" ");
+}
+
+// Second opinion before answering. The answer prompt alone let a small model reply to
+// related-but-different questions (Umrah vs Hajj leave, overseas vs normal fee).
+function verifyPrompt(hits: Hit[]) {
+  return [
+    contextBlock(hits),
+    "\n\nYou check whether the CONTEXT above answers a QUESTION. Reply with one word: YES or NO.",
+    "Reply YES only if the CONTEXT explicitly states the specific fact the question asks for.",
+    "Reply NO if the CONTEXT only covers a related topic, or a different subject: a different type of leave, a different service, a different group of people, a different document or a different number.",
+    "Related words are not enough, the exact thing asked must be written in the CONTEXT.",
+  ].join(" ");
+}
+
+async function contextAnswers(model: LanguageModel, hits: Hit[], question: string) {
+  try {
+    const { text } = await generateText({
+      model,
+      system: verifyPrompt(hits),
+      prompt: `QUESTION: ${question}`,
+      temperature: 0,
+      maxOutputTokens: 4,
+    });
+    return /^\W*(yes|ہاں)/i.test(text.trim());
+  } catch (e) {
+    // If the check itself fails, fall back to the answer prompt rather than blocking.
+    console.error("[kb] verify failed:", e);
+    return true;
+  }
 }
 
 export function kbResponse(opts: {
@@ -152,6 +189,12 @@ export function kbResponse(opts: {
           const used = found
             .filter((h) => h.score >= Math.max(MIN_SCORE, best.score - SCORE_WINDOW))
             .slice(0, MAX_CHUNKS);
+
+          if (best.score < VERIFY_BELOW && !(await contextAnswers(model, used, question))) {
+            send(notFound);
+            writer.write({ type: "text-end", id });
+            return;
+          }
 
           const result = streamText({
             model,
