@@ -41,7 +41,8 @@ export type IngestReport = {
   failed: { file: string; error: string }[];
 };
 
-export async function reindex(dir = docsDir()): Promise<IngestReport> {
+/** force = read every file again, even if it looks unchanged (after the reading code improved). */
+export async function reindex(dir = docsDir(), force = false): Promise<IngestReport> {
   const report: IngestReport = { dir, added: [], skipped: [], removed: [], failed: [] };
   if (!fs.existsSync(dir)) throw new Error(`Documents folder not found: ${dir}`);
 
@@ -58,7 +59,7 @@ export async function reindex(dir = docsDir()): Promise<IngestReport> {
   }
 
   for (const f of files) {
-    const same = existing.find(
+    const same = force ? undefined : existing.find(
       (d) => d.filename === f.filename && d.department === f.department && d.size === f.size && d.mtime === f.mtime,
     );
     if (same) {

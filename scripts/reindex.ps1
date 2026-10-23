@@ -4,7 +4,8 @@
 
 param(
   [string]$Url = "http://localhost:3000",
-  [string]$Password = "Plpa@2026"
+  [string]$Password = "Plpa@2026",
+  [switch]$Force   # read every file again, even unchanged ones
 )
 
 $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
@@ -12,7 +13,8 @@ $body = @{ username = "admin"; password = $Password } | ConvertTo-Json
 Invoke-RestMethod "$Url/api/auth/login" -Method Post -Body $body -ContentType "application/json" -WebSession $session | Out-Null
 
 Write-Host "Reindexing (this can take a minute for new files)..."
-$r = Invoke-RestMethod "$Url/api/kb/reindex" -Method Post -WebSession $session -TimeoutSec 600
+$suffix = if ($Force) { "?force=1" } else { "" }
+$r = Invoke-RestMethod "$Url/api/kb/reindex$suffix" -Method Post -WebSession $session -TimeoutSec 600
 Write-Host "Folder : $($r.dir)"
 Write-Host "Added  : $($r.added -join ', ')"
 Write-Host "Skipped: $($r.skipped.Count) unchanged"

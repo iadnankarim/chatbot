@@ -86,6 +86,50 @@ async function extractArabicPage(
     .join("\n");
 }
 
+/** Letter trigrams of a line, ignoring digits, punctuation and case. */
+function trigrams(line: string) {
+  const letters = line.toLowerCase().replace(/[^\p{L}]/gu, "");
+  const out = new Set<string>();
+  for (let i = 0; i + 3 <= letters.length; i++) out.add(letters.slice(i, i + 3));
+  return out;
+}
+
+function similar(a: Set<string>, b: Set<string>) {
+  if (a.size < 4 || b.size < 4) return false;
+  let shared = 0;
+  for (const t of a) if (b.has(t)) shared++;
+  return shared / (a.size + b.size - shared) >= 0.55;
+}
+
+/**
+ * Removes running headers and footers (document title, "Page 2 / 5", gazette banners):
+ * lines at the top or bottom of a page that repeat on at least half of the pages.
+ * They carry no facts, and left in they dilute every chunk they end up in.
+ * "Repeat" means very similar, not identical: scanned pages differ by page number and OCR slips.
+ */
+export function stripRunningHeaders(pages: PageText[]): PageText[] {
+  if (pages.length < 2) return pages;
+  const needed = Math.max(2, Math.ceil(pages.length / 2));
+
+  const edgeOf = (lines: string[]) =>
+    lines.map((line, i) => ({ i, set: trigrams(line) })).filter(({ i }) => i < 2 || i >= lines.length - 2);
+  const perPage = pages.map((p) => edgeOf(p.text.split("\n")));
+
+  return pages.map((p, pi) => {
+    const lines = p.text.split("\n");
+    const drop = new Set<number>();
+    for (const { i, set } of perPage[pi]) {
+      const pageNumberOnly = /^\s*(?:page|صفحہ)?\s*\d+\s*(?:\/\s*\d+)?\s*$/i.test(lines[i]);
+      let pagesWithIt = 1;
+      for (let other = 0; other < pages.length; other++) {
+        if (other !== pi && perPage[other].some((e) => similar(set, e.set))) pagesWithIt++;
+      }
+      if (pageNumberOnly || pagesWithIt >= needed) drop.add(i);
+    }
+    return { ...p, text: lines.filter((_, i) => !drop.has(i)).join("\n").trim() };
+  });
+}
+
 export async function extractPdfPages(data: Uint8Array): Promise<PageText[]> {
   const pdf = await getDocumentProxy(data);
   const { text } = await extractText(pdf, { mergePages: false });
@@ -98,7 +142,7 @@ export async function extractPdfPages(data: Uint8Array): Promise<PageText[]> {
     const body = hasUrdu ? await extractArabicPage(pdf, i + 1) : plain[i];
     pages.push({ page: i + 1, text: body.trim() });
   }
-  return pages.filter((p) => p.text);
+  return stripRunningHeaders(pages).filter((p) => p.text);
 }
 
 export async function extractDocxPages(data: Uint8Array): Promise<PageText[]> {

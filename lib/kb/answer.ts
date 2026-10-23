@@ -21,6 +21,9 @@ const MIN_SCORE = Number(process.env.KB_MIN_SCORE ?? 0.45);
 // first. On the sample documents related-but-unanswerable questions scored at most 0.64.
 const VERIFY_BELOW = Number(process.env.KB_VERIFY_BELOW ?? 0.66);
 const MAX_CHUNKS = 3;
+// Fixed seed: the same question over the same documents gives the same answer every time,
+// so what is rehearsed before a demo is what appears in it.
+const SEED = 7;
 const SCORE_WINDOW = 0.08; // only use chunks close to the best match
 
 const ARABIC_SCRIPT = /[؀-ۿ]/;
@@ -72,28 +75,42 @@ function buildQuery(messages: UIMessage[]) {
   return last.length < 25 && users.length > 1 ? `${textOf(users.at(-2))} ${last}` : last;
 }
 
-/**
- * Fallback when the model cited nothing usable: the retrieved chunks that share the most
- * words and numbers with the answer.
- */
-function supportingHits(used: Hit[], answer: string) {
-  const tokens = [
-    ...new Set(answer.toLowerCase().match(/[\p{L}\p{N}][\p{L}\p{N},.]*/gu) ?? []),
-  ]
-    .map((t) => t.replace(/[,.]+$/, ""))
-    .filter((t) => t.length >= 2);
+const STOP_WORDS = new Set([
+  "the", "and", "for", "are", "was", "with", "that", "this", "from", "shall", "may", "not",
+  "any", "all", "has", "have", "its", "into", "under", "such", "must", "can", "will", "been",
+  "being", "who", "which", "their", "there", "per", "each", "also",
+]);
 
-  const overlap = used.map((h) => {
-    const text = h.text.toLowerCase();
-    return tokens.filter((t) => text.includes(t)).length;
-  });
-  const max = Math.max(...overlap);
-  if (max === 0) return used.slice(0, 1);
-  return used.filter((_, i) => overlap[i] >= max * 0.9);
+/** The words and numbers that carry meaning in the answer (markers and filler removed). */
+function answerTokens(answer: string) {
+  return [
+    ...new Set(
+      answer.toLowerCase().replace(/\[\d+(?:\s*,\s*\d+)*\]/g, " ").match(/[\p{L}\p{N}]+/gu) ?? [],
+    ),
+  ].filter((t) => (t.length >= 3 || /\d/.test(t)) && !STOP_WORDS.has(t));
 }
 
-/** Passages the model cited, or the best matching ones if its citations are unusable. */
-function citedHits(used: Hit[], rawAnswer: string): Hit[] {
+/** Share (0 to 1) of the answer's words that also appear in the passage. */
+const coverage = (hit: Hit, tokens: string[]) => {
+  if (!tokens.length) return 0;
+  const text = hit.text.toLowerCase();
+  return tokens.filter((t) => text.includes(t)).length / tokens.length;
+};
+
+// If at least this share of the answer's words is in a passage, that passage is the source.
+const STRONG_COVERAGE = 0.6;
+
+/**
+ * Which retrieved passages to show as the source. The answer's own words are the most
+ * reliable evidence, so the passage that contains most of them wins. When the answer is in
+ * another language than the document there is little to compare, and then the passage the
+ * model cited is used (or, failing that, the best search match).
+ */
+function chooseSources(used: Hit[], rawAnswer: string): Hit[] {
+  const scores = used.map((h) => coverage(h, answerTokens(rawAnswer)));
+  const best = Math.max(...scores);
+  if (best >= STRONG_COVERAGE) return used.filter((_, i) => scores[i] >= best - 0.05);
+
   const nums = new Set<number>();
   for (const m of rawAnswer.matchAll(/\[(\d+(?:\s*,\s*\d+)*)\]/g)) {
     for (const n of m[1].split(",")) nums.add(Number(n));
@@ -102,11 +119,15 @@ function citedHits(used: Hit[], rawAnswer: string): Hit[] {
     .filter((n) => n >= 1 && n <= used.length)
     .sort((a, b) => a - b)
     .map((n) => used[n - 1]);
-  return cited.length ? cited : supportingHits(used, rawAnswer);
+  return cited.length ? cited : used.slice(0, 1);
 }
 
-const sourceLine = (h: Hit, urdu: boolean) =>
-  h.page === null ? h.filename : `${h.filename} — ${urdu ? "صفحہ" : "page"} ${h.page}`;
+function sourceLine(h: Hit, urdu: boolean) {
+  if (h.page === null) return h.filename;
+  const range = h.pageEnd !== null && h.pageEnd !== h.page;
+  const label = urdu ? (range ? "صفحات" : "صفحہ") : range ? "pages" : "page";
+  return `${h.filename} — ${label} ${range ? `${h.page}–${h.pageEnd}` : h.page}`;
+}
 
 function sourcesBlock(hits: Hit[], urdu: boolean) {
   const lines = [...new Set(hits.map((h) => sourceLine(h, urdu)))].map((l) => `- ${l}`);
@@ -141,6 +162,7 @@ function verifyPrompt(hits: Hit[]) {
     "\n\nYou check whether the CONTEXT above answers a QUESTION. Reply with one word: YES or NO.",
     "Reply YES only if the CONTEXT explicitly states the specific fact the question asks for.",
     "Reply NO if the CONTEXT only covers a related topic, or a different subject: a different type of leave, a different service, a different group of people, a different document or a different number.",
+    "If the question asks for the name of a person, reply YES only if an actual personal name is written in the CONTEXT, not a job title, a role or a garbled word.",
     "Related words are not enough, the exact thing asked must be written in the CONTEXT.",
   ].join(" ");
 }
@@ -152,6 +174,7 @@ async function contextAnswers(model: LanguageModel, hits: Hit[], question: strin
       system: verifyPrompt(hits),
       prompt: `QUESTION: ${question}`,
       temperature: 0,
+      seed: SEED,
       maxOutputTokens: 4,
     });
     return /^\W*(yes|ہاں)/i.test(text.trim());
@@ -160,6 +183,48 @@ async function contextAnswers(model: LanguageModel, hits: Hit[], question: strin
     console.error("[kb] verify failed:", e);
     return true;
   }
+}
+
+const latinShare = (text: string) => {
+  const letters = text.match(/\p{L}/gu) ?? [];
+  return letters.length ? letters.filter((c) => /[A-Za-z]/.test(c)).length / letters.length : 0;
+};
+
+const translateSystem = (to: "English" | "Urdu") =>
+  `Translate the user's text into ${to}. Reply with the translation only, nothing else.` +
+  (to === "Urdu" ? " Use only Urdu script and simple formal Urdu." : "");
+
+async function translate(model: LanguageModel, text: string, to: "English" | "Urdu") {
+  const { text: out } = await generateText({
+    model,
+    system: translateSystem(to),
+    prompt: text,
+    temperature: 0,
+    seed: SEED,
+    maxOutputTokens: 200,
+  });
+  return out.trim();
+}
+
+// Hindi, Russian or Thai letters sometimes slip into a small model's Urdu.
+const FOREIGN_SCRIPT = /[Ѐ-ӿऀ-ॿ฀-๿]/;
+
+/** Translates a short answer into Urdu, asking again (up to 3 times) if foreign letters appear. */
+async function translateToUrdu(model: LanguageModel, text: string) {
+  let out = "";
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const result = await generateText({
+      model,
+      system: translateSystem("Urdu"),
+      prompt: text,
+      temperature: attempt === 0 ? 0 : 0.4,
+      seed: SEED + attempt,
+      maxOutputTokens: 200,
+    });
+    out = result.text.trim();
+    if (out && !FOREIGN_SCRIPT.test(out)) return out;
+  }
+  return out;
 }
 
 export function kbResponse(opts: {
@@ -190,8 +255,35 @@ export function kbResponse(opts: {
             .filter((h) => h.score >= Math.max(MIN_SCORE, best.score - SCORE_WINDOW))
             .slice(0, MAX_CHUNKS);
 
-          if (best.score < VERIFY_BELOW && !(await contextAnswers(model, used, question))) {
+          // Urdu question over English documents: a small model reads English far better than
+          // it answers in Urdu, so work in English and translate only the short final answer.
+          const viaEnglish = urdu && used.every((h) => latinShare(h.text) > 0.7);
+          const englishQuestion = viaEnglish ? await translate(model, question, "English") : question;
+
+          const verified = best.score < VERIFY_BELOW ? await contextAnswers(model, used, englishQuestion) : true;
+          console.info(`[kb] score=${best.score.toFixed(2)} viaEnglish=${viaEnglish} q="${englishQuestion}" verified=${verified} chunks=${used.map((h) => `${h.filename}:${h.page}`).join(",")}`);
+          if (!verified) {
             send(notFound);
+            writer.write({ type: "text-end", id });
+            return;
+          }
+
+          if (viaEnglish) {
+            const { text } = await generateText({
+              model,
+              system: systemPrompt(used, false),
+              prompt: englishQuestion,
+              temperature: 0.1,
+              seed: SEED,
+              maxOutputTokens: 200,
+            });
+            if (LOOKS_NOT_FOUND.test(text) || !text.trim()) {
+              send(notFound);
+            } else {
+              const answerEn = text.replace(NOT_FOUND_SENTENCE, " ");
+              send(await translateToUrdu(model, answerEn.replace(MARKER, "")));
+              send(sourcesBlock(chooseSources(used, answerEn), true));
+            }
             writer.write({ type: "text-end", id });
             return;
           }
@@ -201,6 +293,7 @@ export function kbResponse(opts: {
             system: systemPrompt(used, urdu),
             messages: [{ role: "user", content: question }],
             temperature: 0.1,
+            seed: SEED,
             onError: ({ error }) => console.error("[kb] model error:", error),
           });
 
@@ -235,7 +328,7 @@ export function kbResponse(opts: {
             send(notFound);
           } else {
             send(raw.slice(sentUpTo).replace(NOT_FOUND_SENTENCE, "").replace(MARKER, ""));
-            send(sourcesBlock(citedHits(used, raw.replace(NOT_FOUND_SENTENCE, " ")), urdu));
+            send(sourcesBlock(chooseSources(used, raw.replace(NOT_FOUND_SENTENCE, " ")), urdu));
           }
         }
       } catch (e) {
