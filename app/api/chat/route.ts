@@ -19,10 +19,20 @@ const llm = createOpenAICompatible({
 const MODEL = process.env.LLM_MODEL ?? "gemma3:4b";
 
 const BASE_PROMPT = [
-  "You are the PLPA AI Assistant, helping employees of the Pakistan Land Port Authority.",
-  "Be brief and clear. Your facts must be about Pakistan only, not India or other countries.",
-  "Never invent fees, dates, rules or document names. If you are not sure, say so.",
+  "You are the PLPA AI Assistant, a helpful assistant for employees of the Pakistan Land Port Authority (PLPA).",
+  "Answer general questions on any topic normally and accurately.",
+  "Be brief and clear. Never invent fees, dates, rules, names or numbers. If you are not sure, say so.",
 ].join(" ");
+
+// In General mode the model has no PLPA documents and knows nothing reliable about
+// PLPA (it makes up port names, counts and locations), so PLPA questions are sent
+// to the Knowledge Base instead of being guessed.
+const PLPA_TOPIC =
+  /\b(plpa|land\s?ports?|torkham|chaman|wagah|taftan|sost|kharlachi|ghulam\s?khan|angoor\s?adda)\b|پی\s?ایل\s?پی\s?اے|لینڈ\s?پورٹ|طورخم|چمن|واہگہ|تفتان|سوست/i;
+
+const PLPA_PROMPT =
+  "This question is about PLPA. You have no verified PLPA information in this mode, so do not guess any facts, numbers, places, dates or names about PLPA. " +
+  "Say briefly that verified PLPA answers are available in Knowledge Base mode, which answers only from PLPA documents.";
 
 // A small model drifts between languages when both are mentioned in one prompt,
 // so the language is detected here (Arabic/Urdu script or not) and only one is requested.
@@ -33,12 +43,16 @@ const LANGUAGE_PROMPT = {
 
 const ARABIC_SCRIPT = /[؀-ۿ]/;
 
-const systemPrompt = (messages: UIMessage[]) =>
-  `${BASE_PROMPT} ${
-    ARABIC_SCRIPT.test(lastUserText(messages))
-      ? LANGUAGE_PROMPT.ur
-      : LANGUAGE_PROMPT.en
-  }`;
+const systemPrompt = (messages: UIMessage[]) => {
+  const text = lastUserText(messages);
+  return [
+    BASE_PROMPT,
+    ARABIC_SCRIPT.test(text) ? LANGUAGE_PROMPT.ur : LANGUAGE_PROMPT.en,
+    PLPA_TOPIC.test(text) && PLPA_PROMPT,
+  ]
+    .filter(Boolean)
+    .join(" ");
+};
 
 const ERROR_MESSAGE =
   "The AI assistant is not responding right now. Please try again in a moment.\n\n" +
@@ -91,6 +105,8 @@ export async function POST(req: Request) {
 
   const result = streamText({
     model: llm(MODEL),
+    // Low temperature: fewer random wrong-script words in Urdu answers.
+    temperature: 0.3,
     system: [systemPrompt(messages), instructions?.trim()]
       .filter(Boolean)
       .join("\n\n"),
