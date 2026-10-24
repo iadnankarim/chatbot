@@ -29,6 +29,7 @@ import {
 import { TooltipIconButton } from "@/components/tooltip-icon-button";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TemplatesMenu } from "@/components/templates-menu";
 import { downloadWord, printPdf } from "@/lib/export-client";
 import { cn } from "@/lib/utils";
 import {
@@ -559,6 +560,7 @@ const ComposerAction: FC = () => {
       <div className="flex items-center gap-1.5">
         {ATTACHMENTS_ENABLED && <ComposerAddAttachment />}
         <KbToggle />
+        <TemplatesMenu />
       </div>
       <div className="flex items-center gap-1.5">
         <AuiIf condition={(s) => s.thread.capabilities.dictation}>

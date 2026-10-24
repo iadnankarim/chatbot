@@ -146,12 +146,14 @@ function pagesFor(hit: Hit, answer: string): [number, number] | null {
   return [Math.min(...pages), Math.max(...pages)];
 }
 
+// Each source is a link that opens the document (a PDF opens at the page, see /api/kb/file).
 function sourceLine(h: Hit, urdu: boolean, answer: string) {
   const pages = pagesFor(h, answer);
-  if (!pages) return h.filename;
+  const url = `/api/kb/file?id=${h.docId}`;
+  if (!pages) return `[${h.filename}](${url})`;
   const range = pages[0] !== pages[1];
   const label = urdu ? (range ? "صفحات" : "صفحہ") : range ? "pages" : "page";
-  return `${h.filename} — ${label} ${range ? `${pages[0]}–${pages[1]}` : pages[0]}`;
+  return `[${h.filename} — ${label} ${range ? `${pages[0]}–${pages[1]}` : pages[0]}](${url}#page=${pages[0]})`;
 }
 
 function sourcesBlock(hits: Hit[], urdu: boolean, answer: string) {

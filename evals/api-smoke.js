@@ -104,6 +104,10 @@ const call = (path, cookie, init = {}) => fetch(B + path, { ...init, headers: { 
   const badDept = await call("/api/kb/upload", admin.cookie, { method: "POST", body: form("a.docx", "x", "../../etc") });
   check("a department name with path tricks is refused (400)", badDept.status === 400, badDept.status);
 
+  // --- opening documents from the Sources links
+  check("/api/kb/file without login is refused (401)", (await call("/api/kb/file?id=1")).status === 401);
+  check("/api/kb/file with an unknown id is 404", (await call("/api/kb/file?id=999999", ahmed.cookie)).status === 404);
+
   // --- pages
   const page = await fetch(B + "/", { redirect: "manual" });
   check("the chat page redirects to /login when logged out", page.status >= 300 && page.status < 400 && (page.headers.get("location") ?? "").includes("/login"), page.status);

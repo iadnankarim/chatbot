@@ -37,6 +37,44 @@ export const KB_SUGGESTIONS = [
   "How long does a complaint's Level 1 resolution take?",
 ];
 
+// Office writing starting points (Templates button). The user fills the [brackets].
+export const TEMPLATES = [
+  {
+    label: "Notice for all staff",
+    prompt:
+      "Draft a formal notice for all PLPA staff.\nSubject: [subject]\nDetails: [what, date, time, place]\nKeep it short and official, with [date] and [designation] at the end.",
+  },
+  {
+    label: "Office order",
+    prompt:
+      "Draft an Office Order.\nSubject: [subject]\nOrder: [what is ordered and for whom]\nEffective from: [date]\nIssued by: [designation]\nUse a formal government style.",
+  },
+  {
+    label: "Reply to a letter",
+    prompt:
+      "Write a polite, formal reply to the letter below. Say: [main points of the reply]\n\nLetter:\n[paste the letter here]",
+  },
+  {
+    label: "Leave application",
+    prompt:
+      "Write a formal leave application.\nName and designation: [name, designation]\nLeave type: [casual / annual / sick]\nFrom [date] to [date]\nReason: [reason]\nAddressed to: [officer]",
+  },
+  {
+    label: "Meeting minutes",
+    prompt:
+      "Write minutes of the meeting with action points (who, what, deadline) from these notes:\n[paste the notes here]",
+  },
+  {
+    label: "Summary in 5 points",
+    prompt: "Summarize the text below in 5 short bullet points:\n[paste the text here]",
+  },
+  {
+    label: "Urdu notice (اردو نوٹس)",
+    prompt:
+      "تمام عملے کے لیے ایک رسمی نوٹس اردو میں لکھیں۔\nموضوع: [موضوع]\nتفصیل: [کیا، کب، کہاں]\nنوٹس مختصر اور سرکاری انداز میں ہو۔",
+  },
+];
+
 // General-purpose prompts that work without documents.
 const SUGGESTIONS_EN = [
   "Write minutes with action points from my meeting notes",
