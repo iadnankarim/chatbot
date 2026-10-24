@@ -9,6 +9,7 @@ import {
   type LanguageModel,
   type UIMessage,
 } from "ai";
+import { stripForeignScripts } from "@/lib/clean-urdu";
 import { extractPages, type PageText } from "@/lib/kb/extract";
 import { translate } from "@/lib/translate";
 
@@ -213,6 +214,8 @@ export async function documentResponse(opts: {
   const stream = createUIMessageStream({
     execute: async ({ writer }) => {
       const id = "doc";
+      // Urdu answers get stray letters of other scripts removed (lib/clean-urdu.ts).
+      const tidy = (text: string) => (urdu ? stripForeignScripts(text) : text);
       writer.write({ type: "text-start", id });
       try {
         const result = streamText({
@@ -239,12 +242,12 @@ export async function documentResponse(opts: {
         for await (const delta of result.textStream) {
           raw += delta;
           if (raw.length - sent > TAIL_HOLD) {
-            writer.write({ type: "text-delta", id, delta: raw.slice(sent, raw.length - TAIL_HOLD) });
+            writer.write({ type: "text-delta", id, delta: tidy(raw.slice(sent, raw.length - TAIL_HOLD)) });
             sent = raw.length - TAIL_HOLD;
           }
         }
         if (!raw.trim()) throw new Error("Model returned no text");
-        writer.write({ type: "text-delta", id, delta: raw.slice(sent).replace(CLOSING_OFFER, "") });
+        writer.write({ type: "text-delta", id, delta: tidy(raw.slice(sent).replace(CLOSING_OFFER, "")) });
 
         const notes: string[] = [];
         if (prepared.latest?.truncated) {

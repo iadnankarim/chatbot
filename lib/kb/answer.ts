@@ -9,6 +9,7 @@ import {
   type UIMessage,
 } from "ai";
 import type { SessionUser } from "@/lib/session";
+import { stripForeignScripts } from "@/lib/clean-urdu";
 import { embedQuery } from "@/lib/kb/embed";
 import { latinShare, translate, translateToUrdu } from "@/lib/translate";
 import { search, type Hit } from "@/lib/kb/store";
@@ -219,12 +220,17 @@ export function kbResponse(opts: {
   const stream = createUIMessageStream({
     execute: async ({ writer }) => {
       const id = "kb";
-      const send = (delta: string) => delta && writer.write({ type: "text-delta", id, delta });
+      let urduMode = false; // Urdu answers get stray letters of other scripts removed
+      const send = (raw: string) => {
+        const delta = urduMode ? stripForeignScripts(raw) : raw;
+        return delta && writer.write({ type: "text-delta", id, delta });
+      };
       writer.write({ type: "text-start", id });
 
       try {
         const question = textOf(messages.filter((m) => m.role === "user").at(-1));
         const urdu = ARABIC_SCRIPT.test(question);
+        urduMode = urdu;
         const notFound = urdu ? NOT_FOUND.ur : NOT_FOUND.en;
         const found = search(await embedQuery(buildQuery(messages)), { k: 5, user });
         const best = found[0];

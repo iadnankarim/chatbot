@@ -15,9 +15,11 @@ Answer quality (each question takes 10-60 s on the POC laptop; run in the backgr
   node evals\tor-eval.js                    17 questions about the real PLPA ERP Terms of Reference
   node evals\real-eval.js                   questions about the PLPA Act / Bill
   node evals\upload-eval.js [1,2,3]         attach a file and summarize it (pick cases by number)
+  node evals\urdu-leak-check.js             10 Urdu questions; counts answers with letters of other scripts (must be 0)
   node evals\calibrate.js                   retrieval scores per question (to tune KB_MIN_SCORE etc.)
 
 Browser flows (headless Microsoft Edge; screenshots are written to evals\out\):
+  node evals\demo-rehearsal.js              THE WHOLE DEMO in one session, with timings (login, chats, file, 8 KB questions, history, admin)
   node evals\auth-flow.js                   login, wrong password, chat, logout
   node evals\kb-flow.js                     Knowledge Base toggle, answer with source, "not found"
   node evals\upload-flow.js [file]          attach a PDF in the chat and read the summary

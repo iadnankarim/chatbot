@@ -8,6 +8,7 @@ import {
 } from "ai";
 
 import { getSessionUser } from "@/lib/auth";
+import { stripForeignScripts } from "@/lib/clean-urdu";
 import { kbResponse } from "@/lib/kb/answer";
 import {
   documentResponse,
@@ -154,7 +155,29 @@ export async function POST(req: Request) {
     onError: ({ error }) => console.error("[chat] model error:", error),
   });
 
-  return result.toUIMessageStreamResponse({
-    onError: () => ERROR_MESSAGE,
+  // English answers are sent as they are. Urdu answers pass through a filter that removes stray
+  // letters of other scripts (see lib/clean-urdu.ts).
+  if (!ARABIC_SCRIPT.test(lastUserText(messages))) {
+    return result.toUIMessageStreamResponse({
+      onError: () => ERROR_MESSAGE,
+    });
+  }
+
+  const stream = createUIMessageStream({
+    execute: async ({ writer }) => {
+      const id = "chat";
+      writer.write({ type: "text-start", id });
+      try {
+        for await (const delta of result.textStream) {
+          const clean = stripForeignScripts(delta);
+          if (clean) writer.write({ type: "text-delta", id, delta: clean });
+        }
+      } catch (e) {
+        console.error("[chat] stream failed:", e);
+        writer.write({ type: "text-delta", id, delta: ERROR_MESSAGE });
+      }
+      writer.write({ type: "text-end", id });
+    },
   });
+  return createUIMessageStreamResponse({ stream });
 }
