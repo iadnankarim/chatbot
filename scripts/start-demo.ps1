@@ -31,7 +31,16 @@ if ($inUse) {
   $inUse | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }
   Start-Sleep -Seconds 2
 }
-if ($Rebuild -or -not (Test-Path ".next\BUILD_ID")) {
+# Rebuild when asked, when there is no build, or when the code changed after the last build
+# (otherwise the demo would silently run an old version of the app).
+$buildId = Get-Item ".next\BUILD_ID" -ErrorAction SilentlyContinue
+$newestCode = @(
+  Get-ChildItem app, lib, components, hooks, public -Recurse -File -ErrorAction SilentlyContinue
+  Get-Item package.json, next.config.ts, proxy.ts, instrumentation.ts -ErrorAction SilentlyContinue
+) | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+$stale = $buildId -and $newestCode -and ($newestCode.LastWriteTime -gt $buildId.LastWriteTime)
+if ($stale) { Write-Host "The code changed after the last build ($($newestCode.Name)), rebuilding." }
+if ($Rebuild -or $stale -or -not $buildId) {
   Write-Host "Building (a few minutes)..."
   npm run build
   if ($LASTEXITCODE -ne 0) { throw "Build failed." }
