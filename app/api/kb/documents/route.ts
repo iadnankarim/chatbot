@@ -1,5 +1,5 @@
 import { getSessionUser } from "@/lib/auth";
-import { logEvent } from "@/lib/events";
+import { logEvent, recentEvents } from "@/lib/events";
 import { deleteDocument } from "@/lib/kb/ingest";
 import { listDocuments } from "@/lib/kb/store";
 
@@ -10,7 +10,13 @@ export async function GET() {
   if (user.role !== "admin") {
     return Response.json({ error: "Admins only." }, { status: 403 });
   }
-  return Response.json({ documents: listDocuments() });
+  // Who added each file, from the activity log (newest entry wins; files placed in the folder by hand have none).
+  const added = recentEvents(1000, ["document_added"]);
+  const documents = listDocuments().map((d) => ({
+    ...d,
+    addedBy: added.find((e) => e.detail?.startsWith(d.filename))?.username ?? null,
+  }));
+  return Response.json({ documents });
 }
 
 // Admin only: remove a document (index entries and the file itself).  DELETE /api/kb/documents?id=3

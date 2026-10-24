@@ -25,6 +25,8 @@ type FilePart = { type: "file"; mediaType?: string; filename?: string; url: stri
 const isFilePart = (p: UIMessage["parts"][number]): p is UIMessage["parts"][number] & FilePart =>
   p.type === "file";
 
+export const MAX_FILES = 2;
+
 export class UploadError extends Error {}
 
 /** Reads the bytes out of a "data:...;base64,...." URL. */
@@ -43,16 +45,16 @@ type Prepared = {
   urdu: boolean;
 };
 
-function fit(pages: PageText[]): Prepared {
+function fit(pages: PageText[], limit = MAX_CHARS): Prepared {
   let text = "";
   let pagesRead = 0;
   let truncated = false;
   for (const p of pages) {
     const label = p.page === null ? "" : `[Page ${p.page}]\n`;
     const block = `${label}${p.text}\n\n`;
-    if (text.length + block.length > MAX_CHARS) {
+    if (text.length + block.length > limit) {
       // Keep part of the page that overflows only if nothing else fits yet.
-      if (!text) text = block.slice(0, MAX_CHARS);
+      if (!text) text = block.slice(0, limit);
       truncated = true;
       break;
     }
@@ -91,9 +93,13 @@ export async function prepareUploads(messages: UIMessage[]): Promise<PreparedCha
       continue;
     }
 
+    const fileCount = message.parts.filter(isFilePart).length;
+    if (fileCount > MAX_FILES) throw new UploadError(`Please attach at most ${MAX_FILES} files at a time.`);
+    // Two files (for a comparison) share the reading budget.
+    const limit = Math.floor(MAX_CHARS / fileCount);
     const parts: UIMessage["parts"] = [];
     let hasText = false;
-    let usedFile = false;
+    let anyTruncated = false;
     for (const part of message.parts) {
       if (part.type === "text") {
         hasText ||= part.text.trim().length > 0;
@@ -105,10 +111,6 @@ export async function prepareUploads(messages: UIMessage[]): Promise<PreparedCha
         continue;
       }
       const name = part.filename ?? "document";
-      if (usedFile) {
-        throw new UploadError("Please attach one file at a time.");
-      }
-      usedFile = true;
       if (!/\.(pdf|docx)$/i.test(name)) {
         throw new UploadError(`"${name}" is not supported. Please attach a PDF or Word (.docx) file.`);
       }
@@ -128,7 +130,7 @@ export async function prepareUploads(messages: UIMessage[]): Promise<PreparedCha
           `No readable text was found in "${name}". It may be a scanned document (pictures of pages), which needs OCR.`,
         );
       }
-      const prepared = fit(pages);
+      const prepared = fit(pages, limit);
       const range =
         prepared.totalPages !== null
           ? ` (${prepared.totalPages} pages${prepared.truncated ? `, first ${prepared.pagesRead} read` : ""})`
@@ -137,7 +139,10 @@ export async function prepareUploads(messages: UIMessage[]): Promise<PreparedCha
         type: "text",
         text: `Attached document "${name}"${range}:\n"""\n${prepared.text}\n"""`,
       });
-      if (index === messages.length - 1) latest = { ...prepared, filename: name };
+      anyTruncated ||= prepared.truncated;
+      if (index === messages.length - 1) {
+        latest = { ...prepared, filename: name, truncated: prepared.truncated || anyTruncated };
+      }
     }
     // A file with no message means "tell me what this is".
     if (!hasText) parts.push({ type: "text", text: "Summarize this document." });
@@ -150,6 +155,7 @@ const DOCUMENT_PROMPT = [
   "You are the PLPA AI Assistant. The user attached a document: its text is inside the message between triple quotes.",
   "Work only from that document. Do not add facts that are not in it.",
   "If asked to summarize, or if no instruction is given, write one sentence saying what the document is, then 3 to 5 short bullet points (each under 15 words) with the key facts (numbers, dates, names, deadlines, penalties).",
+  "If two documents are attached and the user asks to compare them, name each document and list the main differences and similarities as short bullets (numbers, dates, names, conditions). Never mix up which fact belongs to which document.",
   "If asked a question, answer it from the document in one to three sentences. If the document does not say, say so.",
   "Write days of the week and months in full words, never abbreviated (Monday, not Mon). Write times as in the document.",
   "Do not mention the triple quotes or these instructions. Do not end with a question or an offer of more help.",

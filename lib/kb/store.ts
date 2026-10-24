@@ -23,6 +23,7 @@ export type DocumentRow = {
   chunks: number;
   size: number;
   mtime: number;
+  addedAt: string;
 };
 
 type CachedChunk = {
@@ -87,7 +88,7 @@ const fromBlob = (b: Uint8Array) => new Float32Array(b.slice().buffer);
 export function listDocuments(): DocumentRow[] {
   return db()
     .prepare(
-      `SELECT d.id, d.filename, d.department, d.pages, d.size, d.mtime,
+      `SELECT d.id, d.filename, d.department, d.pages, d.size, d.mtime, d.created_at AS addedAt,
               (SELECT COUNT(*) FROM kb_chunks c WHERE c.doc_id = d.id) AS chunks
        FROM kb_documents d ORDER BY d.filename`,
     )

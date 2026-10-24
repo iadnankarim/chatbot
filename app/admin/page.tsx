@@ -7,7 +7,7 @@ import { BrandMark } from "@/components/brand-mark";
 import { Button } from "@/components/ui/button";
 import { BRAND } from "@/lib/brand";
 
-type Doc = { id: number; filename: string; department: string | null; pages: number; chunks: number; size: number };
+type Doc = { id: number; filename: string; department: string | null; pages: number; chunks: number; size: number; addedAt: string; addedBy: string | null };
 type User = { id: number; username: string; name: string; department: string; role: string; disabled: boolean };
 type Ev = { id: number; at: string; username: string | null; action: string; detail: string | null };
 type Counts = { chat: number; kb: number; file: number };
@@ -212,6 +212,7 @@ export default function AdminPage() {
                 <th className={th}>Pages</th>
                 <th className={th}>Passages</th>
                 <th className={th}>Size</th>
+                <th className={th}>Added</th>
                 <th className={th} />
               </tr>
             </thead>
@@ -223,6 +224,7 @@ export default function AdminPage() {
                   <td className={td}>{d.pages}</td>
                   <td className={td}>{d.chunks}</td>
                   <td className={td}>{Math.round(d.size / 1024)} KB</td>
+                  <td className={td}>{d.addedAt.slice(0, 10)}{d.addedBy ? ` by ${d.addedBy}` : ""}</td>
                   <td className={`${td} text-end`}>
                     <button type="button" title="Delete" aria-label={`Delete ${d.filename}`} disabled={busy} onClick={() => remove(d)} className="text-muted-foreground hover:text-destructive">
                       <Trash2Icon className="size-4" />
@@ -231,7 +233,7 @@ export default function AdminPage() {
                 </tr>
               ))}
               {docs.length === 0 && (
-                <tr><td className={td} colSpan={6}>No documents yet.</td></tr>
+                <tr><td className={td} colSpan={7}>No documents yet.</td></tr>
               )}
             </tbody>
           </table>
