@@ -1,0 +1,33 @@
+EVALS: how to check the assistant still works after a change
+=============================================================
+
+All scripts need the app running (BASE_URL, default http://localhost:3000) and, except api-smoke,
+the model server (scripts\start-ollama.ps1). Run from the ai-chatbot folder:
+
+  set BASE_URL=http://localhost:3000        (PowerShell: $env:BASE_URL = "http://localhost:3000")
+
+Fast safety check (10 seconds, no model):
+  node evals\api-smoke.js                   login, per-user chats, admin-only endpoints, upload checks
+
+Answer quality (each question takes 10-60 s on the POC laptop; run in the background):
+  node evals\kb-eval.js                     16 questions about the sample documents (+ "not found" ones)
+  node evals\nt-eval.js                     8 tricky near-topic questions that must answer "not found"
+  node evals\tor-eval.js                    17 questions about the real PLPA ERP Terms of Reference
+  node evals\real-eval.js                   questions about the PLPA Act / Bill
+  node evals\upload-eval.js [1,2,3]         attach a file and summarize it (pick cases by number)
+  node evals\calibrate.js                   retrieval scores per question (to tune KB_MIN_SCORE etc.)
+
+Browser flows (headless Microsoft Edge; screenshots are written to evals\out\):
+  node evals\auth-flow.js                   login, wrong password, chat, logout
+  node evals\kb-flow.js                     Knowledge Base toggle, answer with source, "not found"
+  node evals\upload-flow.js [file]          attach a PDF in the chat and read the summary
+  node evals\persist-flow.js                chat is still there after a refresh; other user sees nothing
+  node evals\admin-run.js                   admin page: add and delete a document, chat audit
+  node evals\offline-check.js               lists every network request that leaves localhost (must be 0)
+
+Documents used by the quality evals live in ..\sample-docs (outside the repo, not committed):
+  the 8 NADRA-style sample files, PLPA_Bill_2025_Passed_by_NA.pdf and PLPA_ERP_Terms_of_Reference.docx.
+  Set DOCS_DIR to use another folder. The questions and expected answers are in the scripts.
+
+Read the results with care: these are small samples, and the local 4B model is not deterministic.
+A single failed question is a reason to look, not proof of a regression.

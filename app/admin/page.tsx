@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ArrowLeftIcon, RefreshCwIcon, Trash2Icon, UploadIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BrandMark } from "@/components/brand-mark";
@@ -49,6 +50,8 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => {
+    // Loading the lists when the page opens; the state is set after the requests finish.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
 
@@ -112,9 +115,9 @@ export default function AdminPage() {
           <h1 className="text-lg font-semibold">{BRAND.name}: Admin</h1>
           <p className="text-muted-foreground text-sm">Documents, users and chat audit</p>
         </div>
-        <a href="/" className="hover:bg-muted flex items-center gap-2 rounded-md px-3 py-2 text-sm">
+        <Link href="/" className="hover:bg-muted flex items-center gap-2 rounded-md px-3 py-2 text-sm">
           <ArrowLeftIcon className="size-4" /> Back to chat
-        </a>
+        </Link>
       </header>
 
       {status && (

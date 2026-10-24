@@ -164,6 +164,8 @@ function ChatRuntime() {
 
   const transport = useMemo(
     () =>
+      // The refs are only read when a message is sent, not while rendering.
+      // eslint-disable-next-line react-hooks/refs
       new AssistantChatTransport({
         api: "/api/chat",
         body: () => ({ instructions: instructionsRef.current, kb: kbRef.current }),
