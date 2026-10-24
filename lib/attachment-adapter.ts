@@ -16,7 +16,7 @@ const toDataUrl = (file: File) =>
 
 export const documentAttachmentAdapter: AttachmentAdapter = {
   accept:
-    ".pdf,.docx,.xlsx,.pptx,.png,.jpg,.jpeg,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.presentationml.presentation,.png,.jpg,.jpeg,image/png,image/jpeg",
+    ".pdf,.docx,.xlsx,.pptx,.png,.jpg,.jpeg,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.presentationml.presentation,image/png,image/jpeg",
 
   async add({ file }) {
     if (!ALLOWED.test(file.name)) {
