@@ -23,6 +23,7 @@ import { ProjectsList } from "@/components/projects-view";
 import { Thread } from "@/components/thread.aui";
 import { ThreadList } from "@/components/thread-list.aui";
 import { UserMenu } from "@/components/user-menu";
+import { documentAttachmentAdapter } from "@/lib/attachment-adapter";
 import { BrandMark } from "@/components/brand-mark";
 import { KbModeProvider, useKbMode } from "@/components/kb-mode";
 import { BRAND, FEATURES, KB_SUGGESTIONS, SUGGESTIONS } from "@/lib/brand";
@@ -154,6 +155,7 @@ function ChatRuntime() {
   const { instructionsRef } = useProjects();
   const { kbRef } = useKbMode();
   const runtime = useChatRuntime({
+    adapters: { attachments: documentAttachmentAdapter },
     transport: new AssistantChatTransport({
       api: "/api/chat",
       body: () => ({ instructions: instructionsRef.current, kb: kbRef.current }),

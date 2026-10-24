@@ -9,6 +9,12 @@ import {
 
 import { getSessionUser } from "@/lib/auth";
 import { kbResponse } from "@/lib/kb/answer";
+import {
+  documentResponse,
+  prepareUploads,
+  textResponse,
+  UploadError,
+} from "@/lib/uploads";
 
 export const maxDuration = 60;
 
@@ -111,6 +117,20 @@ export async function POST(req: Request) {
 
   if (lastUserText(messages) === "demo") {
     return demoResponse();
+  }
+
+  // A file is attached: summarize it or answer from it (takes priority over Knowledge Base mode).
+  if (messages.some((m) => m.role === "user" && m.parts.some((p) => p.type === "file"))) {
+    try {
+      return await documentResponse({
+        prepared: await prepareUploads(messages),
+        model: llm(MODEL),
+        errorMessage: ERROR_MESSAGE,
+      });
+    } catch (e) {
+      if (e instanceof UploadError) return textResponse(e.message);
+      throw e;
+    }
   }
 
   // Knowledge Base mode: answers only from PLPA documents, with sources.

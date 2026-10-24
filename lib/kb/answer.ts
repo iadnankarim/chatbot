@@ -10,6 +10,7 @@ import {
 } from "ai";
 import type { SessionUser } from "@/lib/session";
 import { embedQuery } from "@/lib/kb/embed";
+import { latinShare, translate, translateToUrdu } from "@/lib/translate";
 import { search, type Hit } from "@/lib/kb/store";
 
 // Below this score nothing in the documents is even close, so we answer "not found"
@@ -122,15 +123,37 @@ function chooseSources(used: Hit[], rawAnswer: string): Hit[] {
   return cited.length ? cited : used.slice(0, 1);
 }
 
-function sourceLine(h: Hit, urdu: boolean) {
-  if (h.page === null) return h.filename;
-  const range = h.pageEnd !== null && h.pageEnd !== h.page;
-  const label = urdu ? (range ? "صفحات" : "صفحہ") : range ? "pages" : "page";
-  return `${h.filename} — ${label} ${range ? `${h.page}–${h.pageEnd}` : h.page}`;
+/**
+ * The page(s) a passage's answer is on. A passage can run across a page break; the page whose
+ * part of the text shares the most words with the answer is the one to name.
+ */
+function pagesFor(hit: Hit, answer: string): [number, number] | null {
+  if (hit.page === null) return null;
+  const last = hit.pageEnd ?? hit.page;
+  if (last === hit.page || hit.pageMap.length < 2) return [hit.page, last];
+
+  const tokens = answerTokens(answer);
+  const parts = hit.pageMap.map(([from, page], i) => ({
+    page,
+    text: hit.text.slice(from, hit.pageMap[i + 1]?.[0]).toLowerCase(),
+  }));
+  const scores = parts.map((p) => tokens.filter((t) => p.text.includes(t)).length);
+  const best = Math.max(...scores);
+  if (best === 0) return [hit.page, last];
+  const pages = parts.filter((_, i) => scores[i] === best).map((p) => p.page);
+  return [Math.min(...pages), Math.max(...pages)];
 }
 
-function sourcesBlock(hits: Hit[], urdu: boolean) {
-  const lines = [...new Set(hits.map((h) => sourceLine(h, urdu)))].map((l) => `- ${l}`);
+function sourceLine(h: Hit, urdu: boolean, answer: string) {
+  const pages = pagesFor(h, answer);
+  if (!pages) return h.filename;
+  const range = pages[0] !== pages[1];
+  const label = urdu ? (range ? "صفحات" : "صفحہ") : range ? "pages" : "page";
+  return `${h.filename} — ${label} ${range ? `${pages[0]}–${pages[1]}` : pages[0]}`;
+}
+
+function sourcesBlock(hits: Hit[], urdu: boolean, answer: string) {
+  const lines = [...new Set(hits.map((h) => sourceLine(h, urdu, answer)))].map((l) => `- ${l}`);
   return `\n\n---\n**${urdu ? "ماخذ" : "Sources"}:**\n${lines.join("\n")}`;
 }
 
@@ -183,48 +206,6 @@ async function contextAnswers(model: LanguageModel, hits: Hit[], question: strin
     console.error("[kb] verify failed:", e);
     return true;
   }
-}
-
-const latinShare = (text: string) => {
-  const letters = text.match(/\p{L}/gu) ?? [];
-  return letters.length ? letters.filter((c) => /[A-Za-z]/.test(c)).length / letters.length : 0;
-};
-
-const translateSystem = (to: "English" | "Urdu") =>
-  `Translate the user's text into ${to}. Reply with the translation only, nothing else.` +
-  (to === "Urdu" ? " Use only Urdu script and simple formal Urdu." : "");
-
-async function translate(model: LanguageModel, text: string, to: "English" | "Urdu") {
-  const { text: out } = await generateText({
-    model,
-    system: translateSystem(to),
-    prompt: text,
-    temperature: 0,
-    seed: SEED,
-    maxOutputTokens: 200,
-  });
-  return out.trim();
-}
-
-// Hindi, Russian or Thai letters sometimes slip into a small model's Urdu.
-const FOREIGN_SCRIPT = /[Ѐ-ӿऀ-ॿ฀-๿]/;
-
-/** Translates a short answer into Urdu, asking again (up to 3 times) if foreign letters appear. */
-async function translateToUrdu(model: LanguageModel, text: string) {
-  let out = "";
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const result = await generateText({
-      model,
-      system: translateSystem("Urdu"),
-      prompt: text,
-      temperature: attempt === 0 ? 0 : 0.4,
-      seed: SEED + attempt,
-      maxOutputTokens: 200,
-    });
-    out = result.text.trim();
-    if (out && !FOREIGN_SCRIPT.test(out)) return out;
-  }
-  return out;
 }
 
 export function kbResponse(opts: {
@@ -282,7 +263,7 @@ export function kbResponse(opts: {
             } else {
               const answerEn = text.replace(NOT_FOUND_SENTENCE, " ");
               send(await translateToUrdu(model, answerEn.replace(MARKER, "")));
-              send(sourcesBlock(chooseSources(used, answerEn), true));
+              send(sourcesBlock(chooseSources(used, answerEn), true, answerEn));
             }
             writer.write({ type: "text-end", id });
             return;
@@ -328,7 +309,8 @@ export function kbResponse(opts: {
             send(notFound);
           } else {
             send(raw.slice(sentUpTo).replace(NOT_FOUND_SENTENCE, "").replace(MARKER, ""));
-            send(sourcesBlock(chooseSources(used, raw.replace(NOT_FOUND_SENTENCE, " ")), urdu));
+            const answerText = raw.replace(NOT_FOUND_SENTENCE, " ");
+            send(sourcesBlock(chooseSources(used, answerText), urdu, answerText));
           }
         }
       } catch (e) {

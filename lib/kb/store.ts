@@ -10,6 +10,8 @@ export type Hit = {
   page: number | null;
   /** Last page when the passage runs across a page break. */
   pageEnd: number | null;
+  /** [offset in text, page] where each page starts inside the passage. */
+  pageMap: [number, number][];
   text: string;
 };
 
@@ -29,12 +31,13 @@ type CachedChunk = {
   department: string | null;
   page: number | null;
   pageEnd: number | null;
+  pageMap: [number, number][];
   text: string;
   vec: Float32Array;
 };
 
 // Bump SCHEMA_VERSION when the tables change: dev hot reloads keep globalThis alive.
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 const g = globalThis as unknown as { kbSchemaVersion?: number; kbCache?: CachedChunk[] | null };
 
 function db() {
@@ -57,6 +60,7 @@ function db() {
         doc_id      INTEGER NOT NULL REFERENCES kb_documents(id) ON DELETE CASCADE,
         page        INTEGER,
         page_end    INTEGER,
+        page_map    TEXT,
         chunk_index INTEGER NOT NULL,
         text        TEXT NOT NULL,
         embedding   BLOB NOT NULL
@@ -65,8 +69,9 @@ function db() {
     `);
     // Databases created before page ranges existed: add the column and re-ingest everything.
     const cols = d.prepare("PRAGMA table_info(kb_chunks)").all() as unknown as { name: string }[];
-    if (!cols.some((c) => c.name === "page_end")) {
-      d.exec("ALTER TABLE kb_chunks ADD COLUMN page_end INTEGER");
+    if (!cols.some((c) => c.name === "page_end")) d.exec("ALTER TABLE kb_chunks ADD COLUMN page_end INTEGER");
+    if (!cols.some((c) => c.name === "page_map")) {
+      d.exec("ALTER TABLE kb_chunks ADD COLUMN page_map TEXT");
       d.exec("DELETE FROM kb_documents");
     }
     g.kbSchemaVersion = SCHEMA_VERSION;
@@ -95,7 +100,7 @@ export function removeDocument(id: number) {
 
 export function addDocument(
   doc: { filename: string; department: string | null; pages: number; size: number; mtime: number },
-  chunks: { page: number | null; pageEnd: number | null; index: number; text: string; vec: Float32Array }[],
+  chunks: { page: number | null; pageEnd: number | null; pageMap: [number, number][]; index: number; text: string; vec: Float32Array }[],
 ) {
   const d = db();
   d.exec("BEGIN");
@@ -111,9 +116,9 @@ export function addDocument(
       .run(doc.filename, doc.department, doc.pages, doc.size, doc.mtime);
     const docId = Number(res.lastInsertRowid);
     const insert = d.prepare(
-      "INSERT INTO kb_chunks (doc_id, page, page_end, chunk_index, text, embedding) VALUES (?, ?, ?, ?, ?, ?)",
+      "INSERT INTO kb_chunks (doc_id, page, page_end, page_map, chunk_index, text, embedding) VALUES (?, ?, ?, ?, ?, ?, ?)",
     );
-    for (const c of chunks) insert.run(docId, c.page, c.pageEnd, c.index, c.text, toBlob(c.vec));
+    for (const c of chunks) insert.run(docId, c.page, c.pageEnd, JSON.stringify(c.pageMap), c.index, c.text, toBlob(c.vec));
     d.exec("COMMIT");
   } catch (e) {
     d.exec("ROLLBACK");
@@ -126,11 +131,15 @@ function loadAll(): CachedChunk[] {
   if (g.kbCache) return g.kbCache;
   const rows = db()
     .prepare(
-      `SELECT c.doc_id AS docId, d.filename, d.department, c.page, c.page_end AS pageEnd, c.text, c.embedding
+      `SELECT c.doc_id AS docId, d.filename, d.department, c.page, c.page_end AS pageEnd, c.page_map AS pageMap, c.text, c.embedding
        FROM kb_chunks c JOIN kb_documents d ON d.id = c.doc_id`,
     )
-    .all() as unknown as (Omit<CachedChunk, "vec"> & { embedding: Uint8Array })[];
-  g.kbCache = rows.map(({ embedding, ...r }) => ({ ...r, vec: fromBlob(embedding) }));
+    .all() as unknown as (Omit<CachedChunk, "vec" | "pageMap"> & { embedding: Uint8Array; pageMap: string | null })[];
+  g.kbCache = rows.map(({ embedding, pageMap, ...r }) => ({
+    ...r,
+    pageMap: pageMap ? (JSON.parse(pageMap) as [number, number][]) : [],
+    vec: fromBlob(embedding),
+  }));
   return g.kbCache;
 }
 
@@ -151,7 +160,7 @@ export function search(
     if (!visible(c)) continue;
     let dot = 0;
     for (let i = 0; i < query.length; i++) dot += query[i] * c.vec[i];
-    hits.push({ score: dot, docId: c.docId, filename: c.filename, page: c.page, pageEnd: c.pageEnd, text: c.text });
+    hits.push({ score: dot, docId: c.docId, filename: c.filename, page: c.page, pageEnd: c.pageEnd, pageMap: c.pageMap, text: c.text });
   }
   return hits.sort((a, b) => b.score - a.score).slice(0, opts.k);
 }

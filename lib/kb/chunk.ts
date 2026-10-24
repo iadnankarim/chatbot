@@ -10,6 +10,8 @@ export type Chunk = {
   pageEnd: number | null;
   index: number;
   text: string;
+  /** [offset in text, page] for the first sentence of each page inside this chunk. */
+  pageMap: [number, number][];
 };
 
 const MAX_CHARS = 800;
@@ -35,7 +37,15 @@ export function chunkPages(pages: PageText[]): Chunk[] {
   const flush = () => {
     if (!current.length) return;
     const numbers = current.map((s) => s.page).filter((p): p is number => p !== null);
+    // Where each page begins inside the joined text, so a fact can be traced to its own page.
+    const pageMap: [number, number][] = [];
+    let offset = 0;
+    for (const s of current) {
+      if (s.page !== null && pageMap.at(-1)?.[1] !== s.page) pageMap.push([offset, s.page]);
+      offset += s.text.length + 1;
+    }
     chunks.push({
+      pageMap,
       page: numbers.length ? Math.min(...numbers) : null,
       pageEnd: numbers.length ? Math.max(...numbers) : null,
       index: chunks.length,

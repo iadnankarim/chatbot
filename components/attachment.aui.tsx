@@ -156,6 +156,38 @@ const AttachmentUI: FC = () => {
       : undefined,
   );
 
+  // PDF / Word files: a chip with the file name (a bare icon does not say which file it is).
+  if (!isImage) {
+    return (
+      <AttachmentPrimitive.Root
+        className={cn(
+          "aui-attachment-root relative",
+          isComposer &&
+            "animate-in fade-in-0 zoom-in-95 duration-200 motion-reduce:animate-none",
+        )}
+      >
+        <div
+          title={errorMessage ?? name}
+          className={cn(
+            "bg-muted flex h-12 max-w-64 items-center gap-2 rounded-xl px-3 text-sm",
+            isComposer && "pe-9",
+            isError && "ring-destructive/60 ring-1",
+          )}
+        >
+          {isUploading ? (
+            <Loader2Icon className="text-muted-foreground size-4 shrink-0 animate-spin" />
+          ) : isError ? (
+            <AlertCircleIcon className="text-destructive size-4 shrink-0" />
+          ) : (
+            <FileText className="text-muted-foreground size-4 shrink-0" />
+          )}
+          <span className="truncate">{name}</span>
+        </div>
+        {isComposer && <AttachmentRemove name={name} />}
+      </AttachmentPrimitive.Root>
+    );
+  }
+
   return (
     <TooltipProvider>
       <Tooltip>

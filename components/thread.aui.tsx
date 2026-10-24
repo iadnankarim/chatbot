@@ -505,9 +505,8 @@ const ThreadSuggestionItem: FC = () => {
   );
 };
 
-// File upload is not wired to the backend yet (planned for the upload + summary phase).
-// Sending an attachment to the local model fails, so the UI is switched off until then.
-const ATTACHMENTS_ENABLED = false;
+// PDF and Word files can be attached; the server reads their text (lib/uploads.ts).
+const ATTACHMENTS_ENABLED = true;
 
 const KbToggle: FC = () => {
   const { kbOn, toggle } = useKbMode();
