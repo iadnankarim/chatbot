@@ -21,7 +21,7 @@ function scan(dir: string): Found[] {
       if (entry.isDirectory()) {
         // Only the first folder level names a department.
         walk(full, department ?? entry.name);
-      } else if (/\.(pdf|docx|xlsx|pptx)$/i.test(entry.name)) {
+      } else if (/\.(pdf|docx|xlsx|pptx|png|jpe?g)$/i.test(entry.name)) {
         const stat = fs.statSync(full);
         found.push({ filename: entry.name, department, full, size: stat.size, mtime: Math.floor(stat.mtimeMs) });
       }
@@ -69,7 +69,7 @@ export async function reindex(dir = docsDir(), force = false): Promise<IngestRep
     try {
       const pages = await extractPages(f.filename, new Uint8Array(fs.readFileSync(f.full)));
       const chunks = chunkPages(pages);
-      if (!chunks.length) throw new Error("No readable text found (scanned file? OCR is needed)");
+      if (!chunks.length) throw new Error("No readable text found (blank or too unclear to read)");
       const vectors = await embedTexts(chunks.map((c) => `${title(f.filename)}\n${c.text}`));
       addDocument(
         { filename: f.filename, department: f.department, pages: pages.length, size: f.size, mtime: f.mtime },
@@ -97,7 +97,7 @@ export class AdminError extends Error {}
 /** Saves an uploaded file into the documents folder (a department sub-folder when given). */
 export function saveDocument(filename: string, data: Buffer, department: string | null) {
   const name = safeFilename(filename);
-  if (!/\.(pdf|docx|xlsx|pptx)$/i.test(name)) throw new AdminError("Only PDF, Word, Excel and PowerPoint files can be added.");
+  if (!/\.(pdf|docx|xlsx|pptx|png|jpe?g)$/i.test(name)) throw new AdminError("Only PDF, Word, Excel, PowerPoint and picture (PNG, JPG) files can be added.");
   if (department !== null && !SAFE_DEPARTMENT.test(department)) throw new AdminError("Invalid department name.");
 
   const dir = department ? path.join(docsDir(), department) : docsDir();

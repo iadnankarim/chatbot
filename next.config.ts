@@ -5,6 +5,8 @@ const nextConfig: NextConfig = {
   experimental: {
     agentFeedback: true,
   },
+  // OCR starts worker threads and loads native/wasm files, so it must not be bundled.
+  serverExternalPackages: ["tesseract.js", "@napi-rs/canvas"],
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {

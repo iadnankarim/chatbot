@@ -81,7 +81,7 @@ export default function AdminPage() {
 
   const upload = () => {
     const file = fileRef.current?.files?.[0];
-    if (!file) return setStatus({ kind: "error", text: "Choose a PDF, Word, Excel or PowerPoint file first." });
+    if (!file) return setStatus({ kind: "error", text: "Choose a file first (PDF, Word, Excel, PowerPoint or picture)." });
     void run("Reading the document", async () => {
       const form = new FormData();
       form.set("file", file);
@@ -191,7 +191,7 @@ export default function AdminPage() {
         </div>
 
         <div className="mb-4 flex flex-wrap items-center gap-2">
-          <input ref={fileRef} type="file" accept=".pdf,.docx,.xlsx,.pptx" className="text-sm" disabled={busy} />
+          <input ref={fileRef} type="file" accept=".pdf,.docx,.xlsx,.pptx,.png,.jpg,.jpeg" className="text-sm" disabled={busy} />
           <select value={department} onChange={(e) => setDepartment(e.target.value)} disabled={busy} className="bg-background rounded-md border px-2 py-1.5 text-sm">
             <option value="">Visible to everyone</option>
             {departments.map((d) => (

@@ -111,8 +111,8 @@ export async function prepareUploads(messages: UIMessage[]): Promise<PreparedCha
         continue;
       }
       const name = part.filename ?? "document";
-      if (!/\.(pdf|docx|xlsx|pptx)$/i.test(name)) {
-        throw new UploadError(`"${name}" is not supported. Please attach a PDF, Word, Excel or PowerPoint file.`);
+      if (!/\.(pdf|docx|xlsx|pptx|png|jpe?g)$/i.test(name)) {
+        throw new UploadError(`"${name}" is not supported. Please attach a PDF, Word, Excel, PowerPoint or picture (PNG, JPG) file.`);
       }
       const bytes = bytesFromDataUrl(part.url);
       if (bytes.length > MAX_UPLOAD_BYTES) {
@@ -127,7 +127,7 @@ export async function prepareUploads(messages: UIMessage[]): Promise<PreparedCha
       }
       if (!pages.length) {
         throw new UploadError(
-          `No readable text was found in "${name}". It may be a scanned document (pictures of pages), which needs OCR.`,
+          `No readable text was found in "${name}". It may be blank, or the picture may be too unclear to read.`,
         );
       }
       const prepared = fit(pages, limit);

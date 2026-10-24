@@ -3,7 +3,8 @@
 import JSZip from "jszip";
 import mammoth from "mammoth";
 import readExcelFile from "read-excel-file/node";
-import { extractText, getDocumentProxy } from "unpdf";
+import { extractText, getDocumentProxy, renderPageAsImage } from "unpdf";
+import { OCR_MAX_PAGES, ocrImage } from "./ocr";
 
 export type PageText = {
   /** 1-based page number, or null when the format has no pages (Word). */
@@ -144,6 +145,15 @@ export async function extractPdfPages(data: Uint8Array): Promise<PageText[]> {
     const body = hasUrdu ? await extractArabicPage(pdf, i + 1) : plain[i];
     pages.push({ page: i + 1, text: body.trim() });
   }
+
+  // Pages without a text layer are scans (pictures of pages): read them with OCR.
+  let ocrDone = 0;
+  for (const p of pages) {
+    if (p.text.replace(/\s/g, "").length >= 25 || ocrDone >= OCR_MAX_PAGES) continue;
+    const png = await renderPageAsImage(pdf, p.page as number, { canvasImport: () => import("@napi-rs/canvas"), scale: 2 });
+    p.text = await ocrImage(new Uint8Array(png));
+    ocrDone++;
+  }
   return stripRunningHeaders(pages).filter((p) => p.text);
 }
 
@@ -231,5 +241,9 @@ export async function extractPages(filename: string, data: Uint8Array): Promise<
   if (lower.endsWith(".docx")) return extractDocxPages(data);
   if (lower.endsWith(".xlsx")) return extractXlsxPages(data);
   if (lower.endsWith(".pptx")) return extractPptxPages(data);
+  if (/\.(png|jpe?g)$/.test(lower)) {
+    const text = await ocrImage(data);
+    return text ? [{ page: null, text }] : [];
+  }
   throw new Error(`Unsupported file type: ${filename}`);
 }
