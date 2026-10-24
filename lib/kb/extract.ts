@@ -145,9 +145,41 @@ export async function extractPdfPages(data: Uint8Array): Promise<PageText[]> {
   return stripRunningHeaders(pages).filter((p) => p.text);
 }
 
+const HTML_ENTITIES: Record<string, string> = {
+  "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'", "&nbsp;": " ",
+};
+const decodeEntities = (s: string) => s.replace(/&(?:amp|lt|gt|quot|#39|nbsp);/g, (e) => HTML_ENTITIES[e] ?? e);
+const stripTags = (s: string) => s.replace(/<[^>]+>/g, "");
+
+/**
+ * Word -> plain text where every table row stays on ONE line ("19. Stakeholder Portal | Phase 2 |
+ * Month 8 to 11"). Plain text extraction puts each cell on its own line, which loses which phase,
+ * date or fee belongs to which row.
+ */
+function wordHtmlToText(html: string): string {
+  const withTables = html.replace(/<tr[^>]*>([\s\S]*?)<\/tr>/g, (_, row: string) => {
+    const cells = [...row.matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/g)].map((m) =>
+      // Several paragraphs inside one cell (a list of modules) stay together, separated by ";".
+      decodeEntities(
+        stripTags(m[1].replace(/<\/(?:p|li)>/g, "; ")),
+      )
+        .replace(/\s+/g, " ")
+        .replace(/(?:;\s*)+$/, "")
+        .trim(),
+    );
+    return `<p>${cells.filter(Boolean).join(" | ")}</p>`;
+  });
+  return decodeEntities(
+    stripTags(withTables.replace(/<\/(?:p|h[1-6]|li|div|table)>|<br\s*\/?>/g, "\n")),
+  )
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 export async function extractDocxPages(data: Uint8Array): Promise<PageText[]> {
-  const { value } = await mammoth.extractRawText({ buffer: Buffer.from(data) });
-  const text = value.trim();
+  const { value } = await mammoth.convertToHtml({ buffer: Buffer.from(data) });
+  const text = wordHtmlToText(value);
   // Word files do not store page numbers, so the whole file is one unnumbered block.
   return text ? [{ page: null, text }] : [];
 }
