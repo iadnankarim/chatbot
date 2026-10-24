@@ -1,6 +1,8 @@
 // Text extraction for the Knowledge Base: PDF (page by page) and Word.
 // Self-contained on purpose (no project imports) so it can also run as a plain Node script.
+import JSZip from "jszip";
 import mammoth from "mammoth";
+import readExcelFile from "read-excel-file/node";
 import { extractText, getDocumentProxy } from "unpdf";
 
 export type PageText = {
@@ -184,9 +186,50 @@ export async function extractDocxPages(data: Uint8Array): Promise<PageText[]> {
   return text ? [{ page: null, text }] : [];
 }
 
+/** Excel: one block per sheet, each row on one line as "a | b | c". */
+export async function extractXlsxPages(data: Uint8Array): Promise<PageText[]> {
+  const sheets = await readExcelFile(Buffer.from(data));
+  const pages: PageText[] = [];
+  sheets.forEach((s, i) => {
+    const rows = s.data
+      .map((row) =>
+        row
+          .map((cell) =>
+            cell instanceof Date ? cell.toISOString().slice(0, 10) : cell === null || cell === undefined ? "" : String(cell),
+          )
+          .join(" | ")
+          .replace(/(?:\s*\|\s*)+$/, "")
+          .trim(),
+      )
+      .filter(Boolean);
+    if (rows.length) pages.push({ page: i + 1, text: `Sheet "${s.sheet}"\n${rows.join("\n")}` });
+  });
+  return pages;
+}
+
+/** PowerPoint: one page per slide, the text of every paragraph on its own line. */
+export async function extractPptxPages(data: Uint8Array): Promise<PageText[]> {
+  const zip = await JSZip.loadAsync(data);
+  const slides = Object.keys(zip.files)
+    .map((name) => ({ name, n: Number(/^ppt\/slides\/slide(\d+)\.xml$/.exec(name)?.[1]) }))
+    .filter((s) => Number.isInteger(s.n))
+    .sort((a, b) => a.n - b.n);
+  const pages: PageText[] = [];
+  for (const [i, s] of slides.entries()) {
+    const xml = await zip.files[s.name].async("string");
+    const lines = [...xml.matchAll(/<a:p[ >][\s\S]*?<\/a:p>/g)]
+      .map((p) => decodeEntities([...p[0].matchAll(/<a:t[^>]*>([\s\S]*?)<\/a:t>/g)].map((t) => t[1]).join("")).trim())
+      .filter(Boolean);
+    if (lines.length) pages.push({ page: i + 1, text: lines.join("\n") });
+  }
+  return pages;
+}
+
 export async function extractPages(filename: string, data: Uint8Array): Promise<PageText[]> {
   const lower = filename.toLowerCase();
   if (lower.endsWith(".pdf")) return extractPdfPages(data);
   if (lower.endsWith(".docx")) return extractDocxPages(data);
+  if (lower.endsWith(".xlsx")) return extractXlsxPages(data);
+  if (lower.endsWith(".pptx")) return extractPptxPages(data);
   throw new Error(`Unsupported file type: ${filename}`);
 }

@@ -111,8 +111,8 @@ export async function prepareUploads(messages: UIMessage[]): Promise<PreparedCha
         continue;
       }
       const name = part.filename ?? "document";
-      if (!/\.(pdf|docx)$/i.test(name)) {
-        throw new UploadError(`"${name}" is not supported. Please attach a PDF or Word (.docx) file.`);
+      if (!/\.(pdf|docx|xlsx|pptx)$/i.test(name)) {
+        throw new UploadError(`"${name}" is not supported. Please attach a PDF, Word, Excel or PowerPoint file.`);
       }
       const bytes = bytesFromDataUrl(part.url);
       if (bytes.length > MAX_UPLOAD_BYTES) {

@@ -4,7 +4,7 @@ import type { AttachmentAdapter } from "@assistant-ui/react";
 import { generateId } from "ai";
 
 export const MAX_FILE_MB = 10;
-const ALLOWED = /\.(pdf|docx)$/i;
+const ALLOWED = /\.(pdf|docx|xlsx|pptx)$/i;
 
 const toDataUrl = (file: File) =>
   new Promise<string>((resolve, reject) => {
@@ -16,11 +16,11 @@ const toDataUrl = (file: File) =>
 
 export const documentAttachmentAdapter: AttachmentAdapter = {
   accept:
-    ".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".pdf,.docx,.xlsx,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.presentationml.presentation",
 
   async add({ file }) {
     if (!ALLOWED.test(file.name)) {
-      throw new Error("Only PDF and Word (.docx) files can be attached.");
+      throw new Error("Only PDF, Word, Excel and PowerPoint files can be attached.");
     }
     if (file.size > MAX_FILE_MB * 1024 * 1024) {
       throw new Error(`The file is larger than ${MAX_FILE_MB} MB.`);
