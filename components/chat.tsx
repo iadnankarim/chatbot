@@ -6,13 +6,19 @@ import {
   Suggestions,
   useAui,
   useAuiState,
+  useRemoteThreadListRuntime,
 } from "@assistant-ui/react";
+import { useChat } from "@ai-sdk/react";
+import {
+  createLocalStorageAdapter,
+  createSimpleTitleAdapter,
+} from "@assistant-ui/core/react";
 import {
   AssistantChatTransport,
-  useChatRuntime,
+  useAISDKRuntime,
 } from "@assistant-ui/react-ai-sdk";
 import { FolderIcon, PanelLeftIcon, PlusIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CreateProjectDialog } from "@/components/create-project-dialog";
 import {
   ProjectsProvider,
@@ -24,6 +30,7 @@ import { Thread } from "@/components/thread.aui";
 import { ThreadList } from "@/components/thread-list.aui";
 import { UserMenu } from "@/components/user-menu";
 import { documentAttachmentAdapter } from "@/lib/attachment-adapter";
+import { serverStorage } from "@/lib/server-storage";
 import { BrandMark } from "@/components/brand-mark";
 import { KbModeProvider, useKbMode } from "@/components/kb-mode";
 import { BRAND, FEATURES, KB_SUGGESTIONS, SUGGESTIONS } from "@/lib/brand";
@@ -154,12 +161,36 @@ function ChatLayout() {
 function ChatRuntime() {
   const { instructionsRef } = useProjects();
   const { kbRef } = useKbMode();
-  const runtime = useChatRuntime({
-    adapters: { attachments: documentAttachmentAdapter },
-    transport: new AssistantChatTransport({
-      api: "/api/chat",
-      body: () => ({ instructions: instructionsRef.current, kb: kbRef.current }),
-    }),
+
+  const transport = useMemo(
+    () =>
+      new AssistantChatTransport({
+        api: "/api/chat",
+        body: () => ({ instructions: instructionsRef.current, kb: kbRef.current }),
+      }),
+    [instructionsRef, kbRef],
+  );
+
+  // Threads and messages are saved on the server for the logged-in user (app/api/storage),
+  // so chats survive a refresh and are never shared between users.
+  const adapter = useMemo(
+    () =>
+      createLocalStorageAdapter({
+        storage: serverStorage,
+        prefix: "plpa:",
+        titleGenerator: createSimpleTitleAdapter(),
+      }),
+    [],
+  );
+
+  const runtime = useRemoteThreadListRuntime({
+    adapter,
+    runtimeHook: function RuntimeHook() {
+      const chat = useChat({ transport });
+      return useAISDKRuntime(chat, {
+        adapters: { attachments: documentAttachmentAdapter },
+      });
+    },
   });
 
   return (
