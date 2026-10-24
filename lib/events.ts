@@ -6,7 +6,8 @@ export type EventAction =
   | "login" | "login_failed" | "logout" | "password_changed"
   | "chat" | "kb" | "file" | "kb_not_found"
   | "user_created" | "user_updated" | "password_reset"
-  | "document_added" | "document_deleted" | "reindex";
+  | "document_added" | "document_deleted" | "reindex"
+  | "feedback_up" | "feedback_down";
 
 const g = globalThis as unknown as { eventsReady?: boolean };
 

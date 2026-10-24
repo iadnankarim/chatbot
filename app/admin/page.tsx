@@ -14,8 +14,9 @@ type Counts = { chat: number; kb: number; file: number };
 type Stats = {
   users: number; activeUsers: number; documents: number; passages: number; chatsSaved: number;
   questionsToday: Counts; questionsWeek: Counts; notFoundWeek: number; failedLoginsWeek: number;
+  helpfulWeek: number; notHelpfulWeek: number;
 };
-type Activity = { stats: Stats; notFound: Ev[]; activity: Ev[] };
+type Activity = { stats: Stats; notFound: Ev[]; notHelpful: Ev[]; activity: Ev[] };
 type Chat = { id: string; title: string; messageCount: number; updatedAt: string | null };
 type Audit = { userId: number; username: string; name: string; department: string; threads: Chat[] };
 type Msg = { role: string; text: string };
@@ -169,6 +170,8 @@ export default function AdminPage() {
               ["Documents", `${activity.stats.documents} (${activity.stats.passages} passages)`],
               ["Saved chats", activity.stats.chatsSaved],
               ["Failed sign-ins, 7 days", activity.stats.failedLoginsWeek],
+              ["Marked helpful, 7 days", activity.stats.helpfulWeek],
+              ["Marked not helpful, 7 days", activity.stats.notHelpfulWeek],
             ].map(([label, value]) => (
               <div key={label} className="rounded-lg border px-4 py-3">
                 <p className="text-2xl font-semibold">{value}</p>
@@ -325,6 +328,22 @@ export default function AdminPage() {
           {activity.notFound.length === 0 && <p className="text-muted-foreground text-sm">None yet.</p>}
           <ul className="flex flex-col gap-1 text-sm">
             {activity.notFound.map((e) => (
+              <li key={e.id} dir="auto" className="flex gap-3 border-b py-1.5 last:border-0">
+                <span className="text-muted-foreground shrink-0 text-xs">{e.at} · {e.username}</span>
+                <span>{e.detail}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {activity && (
+        <section className={card}>
+          <h2 className="mb-1 font-medium">Answers marked not helpful</h2>
+          <p className="text-muted-foreground mb-3 text-xs">Start of the answer the user disliked.</p>
+          {activity.notHelpful.length === 0 && <p className="text-muted-foreground text-sm">None yet.</p>}
+          <ul className="flex flex-col gap-1 text-sm">
+            {activity.notHelpful.map((e) => (
               <li key={e.id} dir="auto" className="flex gap-3 border-b py-1.5 last:border-0">
                 <span className="text-muted-foreground shrink-0 text-xs">{e.at} · {e.username}</span>
                 <span>{e.detail}</span>

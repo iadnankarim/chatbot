@@ -8,7 +8,7 @@ import { listUsers } from "@/lib/users";
 
 const ACTIVITY = [
   "login", "login_failed", "password_changed", "password_reset", "user_created", "user_updated",
-  "document_added", "document_deleted", "reindex",
+  "document_added", "document_deleted", "reindex", "feedback_down",
 ] as const;
 
 export async function GET() {
@@ -41,8 +41,11 @@ export async function GET() {
       questionsWeek: { chat: count(week, "chat"), kb: count(week, "kb"), file: count(week, "file") },
       notFoundWeek: count(week, "kb_not_found"),
       failedLoginsWeek: count(week, "login_failed"),
+      helpfulWeek: count(week, "feedback_up"),
+      notHelpfulWeek: count(week, "feedback_down"),
     },
     notFound: recentEvents(30, ["kb_not_found"]),
+    notHelpful: recentEvents(30, ["feedback_down"]),
     activity: recentEvents(60, [...ACTIVITY]),
   });
 }

@@ -39,10 +39,10 @@ export const KB_SUGGESTIONS = [
 
 // General-purpose prompts that work without documents.
 const SUGGESTIONS_EN = [
-  "Draft a polite email asking my manager for two days of leave",
-  "Give me 5 tips for running an effective meeting",
-  "Explain the difference between a memo and an office order",
-  "Write a short thank-you note to a colleague",
+  "Write minutes with action points from my meeting notes",
+  "Draft a notice for all staff about an office closure",
+  "Reply politely to a letter from a trader",
+  "Make my draft more formal and fix the grammar",
 ];
 
 const SUGGESTIONS_UR = [

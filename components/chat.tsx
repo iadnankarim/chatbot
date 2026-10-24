@@ -30,6 +30,7 @@ import { Thread } from "@/components/thread.aui";
 import { ThreadList } from "@/components/thread-list.aui";
 import { UserMenu } from "@/components/user-menu";
 import { documentAttachmentAdapter } from "@/lib/attachment-adapter";
+import { feedbackAdapter } from "@/lib/feedback-adapter";
 import { serverStorage } from "@/lib/server-storage";
 import { BrandMark } from "@/components/brand-mark";
 import { KbModeProvider, useKbMode } from "@/components/kb-mode";
@@ -190,7 +191,7 @@ function ChatRuntime() {
     runtimeHook: function RuntimeHook() {
       const chat = useChat({ transport });
       return useAISDKRuntime(chat, {
-        adapters: { attachments: documentAttachmentAdapter },
+        adapters: { attachments: documentAttachmentAdapter, feedback: feedbackAdapter },
       });
     },
   });
