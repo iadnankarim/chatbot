@@ -57,6 +57,44 @@ const call = (path, cookie, init = {}) => fetch(B + path, { ...init, headers: { 
   const list = users.ok ? (await users.json()).users : [];
   check("admin can list users, and no password data is returned", list.length >= 4 && !JSON.stringify(list).includes("password"), users.status);
 
+  // --- user management and activity (admin only)
+  const act = await call("/api/admin/activity", ahmed.cookie);
+  check("activity as a normal user is refused (403)", act.status === 403, act.status);
+  const actAdmin = await call("/api/admin/activity", admin.cookie);
+  const actData = actAdmin.ok ? await actAdmin.json() : {};
+  check("admin gets usage figures", typeof actData.stats?.users === "number" && Array.isArray(actData.activity), actAdmin.status);
+  const json = (method, body) => ({ method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  const uname = "smoke" + String(Date.now()).slice(-6);
+  const mk = (b) => call("/api/admin/users", admin.cookie, json("POST", b));
+  check("a normal user cannot create accounts (403)", (await call("/api/admin/users", ahmed.cookie, json("POST", { username: uname, name: "Smoke Test", department: "IT", role: "user", password: "Smoke-pass-1" }))).status === 403);
+  check("a short password is refused (400)", (await mk({ username: uname, name: "Smoke Test", department: "IT", role: "user", password: "short" })).status === 400);
+  check("a bad username is refused (400)", (await mk({ username: "A B", name: "Smoke Test", department: "IT", role: "user", password: "Smoke-pass-1" })).status === 400);
+  const made = await mk({ username: uname, name: "Smoke Test", department: "IT", role: "user", password: "Smoke-pass-1" });
+  const madeUser = made.ok ? (await made.json()).user : null;
+  check("admin creates an account", !!madeUser, made.status);
+  check("a duplicate username is refused (400)", (await mk({ username: uname, name: "Smoke Test", department: "IT", role: "user", password: "Smoke-pass-1" })).status === 400);
+  const tryLogin = (password) => fetch(B + "/api/auth/login", json("POST", { username: uname, password }));
+  const first = await tryLogin("Smoke-pass-1");
+  const newCookie = (first.headers.get("set-cookie") ?? "").split(";")[0];
+  check("the new account can sign in", first.ok && !!newCookie, first.status);
+  const pw = await call("/api/auth/password", newCookie, json("POST", { current: "wrong-one", next: "Another-pass-2" }));
+  check("changing password with a wrong current password is refused (400)", pw.status === 400, pw.status);
+  const pw2 = await call("/api/auth/password", newCookie, json("POST", { current: "Smoke-pass-1", next: "Another-pass-2" }));
+  check("the user changes their own password", pw2.ok, pw2.status);
+  check("the old password no longer works (401)", (await tryLogin("Smoke-pass-1")).status === 401);
+  const reset = await call("/api/admin/users", admin.cookie, json("PATCH", { id: madeUser?.id, password: "Reset-pass-3" }));
+  check("admin resets the password", reset.ok, reset.status);
+  check("the reset password works", (await tryLogin("Reset-pass-3")).ok);
+  const off = await call("/api/admin/users", admin.cookie, json("PATCH", { id: madeUser?.id, disabled: true }));
+  check("admin switches the account off", off.ok, off.status);
+  check("a switched-off account cannot sign in (403)", (await tryLogin("Reset-pass-3")).status === 403);
+  check("an already-open session of a switched-off account is refused (401)", (await call("/api/auth/me", newCookie)).status === 401);
+  const self = await call("/api/admin/users", admin.cookie, json("PATCH", { id: (await (await call("/api/auth/me", admin.cookie)).json()).user.id, disabled: true }));
+  check("admin cannot switch off their own account (400)", self.status === 400, self.status);
+  const log = await (await call("/api/admin/activity", admin.cookie)).json();
+  check("the activity log shows the new account and the password reset", log.activity.some((e) => e.action === "user_created" && e.detail.includes(uname)) && log.activity.some((e) => e.action === "password_reset"));
+  // keep the account list clean for the next run: nothing can delete an account, so it stays switched off
+
   // --- upload validation (nothing is saved: all of these must be refused)
   const form = (name, content, dept) => { const f = new FormData(); f.set("file", new File([content], name)); if (dept !== undefined) f.set("department", dept); return f; };
   const asUser = await call("/api/kb/upload", ahmed.cookie, { method: "POST", body: form("a.docx", "x") });

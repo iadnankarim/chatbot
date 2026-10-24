@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
-import { findUserByUsername } from "@/lib/db";
+import { logEvent } from "@/lib/events";
+import { getLoginRow } from "@/lib/users";
 import {
   SESSION_COOKIE,
   sessionCookieOptions,
@@ -39,9 +40,10 @@ export async function POST(req: Request) {
     );
   }
 
-  const user = findUserByUsername(username);
-  const ok = await bcrypt.compare(password, user?.password_hash ?? DUMMY_HASH);
+  const user = getLoginRow(username);
+  const ok = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_HASH);
   if (!user || !ok) {
+    logEvent(user ?? null, "login_failed", user ? undefined : username);
     const count = (entry?.count ?? 0) + 1;
     fails.set(
       key,
@@ -55,6 +57,14 @@ export async function POST(req: Request) {
     );
   }
 
+  if (user.disabled) {
+    logEvent(user, "login_failed", "account switched off");
+    return Response.json(
+      { error: "This account has been switched off. Please contact the administrator." },
+      { status: 403 },
+    );
+  }
+
   fails.delete(key);
   const sessionUser = {
     id: user.id,
@@ -64,5 +74,6 @@ export async function POST(req: Request) {
     role: user.role,
   };
   (await cookies()).set(SESSION_COOKIE, await signSession(sessionUser), sessionCookieOptions);
+  logEvent(sessionUser, "login");
   return Response.json({ user: sessionUser });
 }

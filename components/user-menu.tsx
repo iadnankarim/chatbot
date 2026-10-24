@@ -4,6 +4,7 @@ import {
   ChevronDownIcon,
   GlobeIcon,
   HelpCircleIcon,
+  KeyRoundIcon,
   LogOutIcon,
   SettingsIcon,
   ShieldIcon,
@@ -101,6 +102,14 @@ export const UserMenu: FC = () => {
               <ShieldIcon className="size-4" />
             </a>
           )}
+          <a
+            href="/account"
+            title="Change password"
+            aria-label="Change password"
+            className="hover:bg-muted text-muted-foreground hover:text-foreground flex size-8 shrink-0 items-center justify-center rounded-md"
+          >
+            <KeyRoundIcon className="size-4" />
+          </a>
           <button
             type="button"
             title="Log out"

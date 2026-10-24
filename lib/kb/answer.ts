@@ -10,6 +10,7 @@ import {
 } from "ai";
 import type { SessionUser } from "@/lib/session";
 import { stripForeignScripts } from "@/lib/clean-urdu";
+import { logEvent } from "@/lib/events";
 import { embedQuery } from "@/lib/kb/embed";
 import { latinShare, translate, translateToUrdu } from "@/lib/translate";
 import { search, type Hit } from "@/lib/kb/store";
@@ -236,6 +237,7 @@ export function kbResponse(opts: {
         const best = found[0];
 
         if (!best || best.score < MIN_SCORE) {
+          logEvent(user, "kb_not_found", question);
           send(notFound);
         } else {
           const used = found
@@ -250,6 +252,7 @@ export function kbResponse(opts: {
           const verified = best.score < VERIFY_BELOW ? await contextAnswers(model, used, englishQuestion) : true;
           console.info(`[kb] score=${best.score.toFixed(2)} viaEnglish=${viaEnglish} q="${englishQuestion}" verified=${verified} chunks=${used.map((h) => `${h.filename}:${h.page}`).join(",")}`);
           if (!verified) {
+            logEvent(user, "kb_not_found", question);
             send(notFound);
             writer.write({ type: "text-end", id });
             return;
@@ -265,6 +268,7 @@ export function kbResponse(opts: {
               maxOutputTokens: 200,
             });
             if (LOOKS_NOT_FOUND.test(text) || !text.trim()) {
+              logEvent(user, "kb_not_found", question);
               send(notFound);
             } else {
               const answerEn = text.replace(NOT_FOUND_SENTENCE, " ");
@@ -312,6 +316,7 @@ export function kbResponse(opts: {
           if (mode === "undecided") mode = LOOKS_NOT_FOUND.test(raw) ? "notfound" : "answer";
 
           if (mode === "notfound") {
+            logEvent(user, "kb_not_found", question);
             send(notFound);
           } else {
             send(raw.slice(sentUpTo).replace(NOT_FOUND_SENTENCE, "").replace(MARKER, ""));

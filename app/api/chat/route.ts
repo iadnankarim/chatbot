@@ -9,6 +9,7 @@ import {
 
 import { getSessionUser } from "@/lib/auth";
 import { stripForeignScripts } from "@/lib/clean-urdu";
+import { logEvent } from "@/lib/events";
 import { kbResponse } from "@/lib/kb/answer";
 import {
   documentResponse,
@@ -120,8 +121,11 @@ export async function POST(req: Request) {
     return demoResponse();
   }
 
+  const asked = lastUserText(messages).slice(0, 200);
+
   // A file is attached: summarize it or answer from it (takes priority over Knowledge Base mode).
   if (messages.some((m) => m.role === "user" && m.parts.some((p) => p.type === "file"))) {
+    logEvent(user, "file", asked || "(file only)");
     try {
       return await documentResponse({
         prepared: await prepareUploads(messages),
@@ -136,6 +140,7 @@ export async function POST(req: Request) {
 
   // Knowledge Base mode: answers only from PLPA documents, with sources.
   if (kb) {
+    logEvent(user, "kb", asked);
     return kbResponse({
       messages,
       user,
@@ -144,6 +149,7 @@ export async function POST(req: Request) {
     });
   }
 
+  logEvent(user, "chat", asked);
   const result = streamText({
     model: llm(MODEL),
     // Low temperature: fewer random wrong-script words in Urdu answers.

@@ -1,4 +1,5 @@
 import { getSessionUser } from "@/lib/auth";
+import { logEvent } from "@/lib/events";
 import { AdminError, reindex, saveDocument } from "@/lib/kb/ingest";
 
 export const maxDuration = 300;
@@ -21,6 +22,7 @@ export async function POST(req: Request) {
 
     const saved = saveDocument(file.name, Buffer.from(await file.arrayBuffer()), department);
     const report = await reindex();
+    logEvent(user, "document_added", `${saved}${department ? ` (only ${department})` : " (everyone)"}`);
     return Response.json({ saved, report });
   } catch (e) {
     if (e instanceof AdminError) return Response.json({ error: e.message }, { status: 400 });

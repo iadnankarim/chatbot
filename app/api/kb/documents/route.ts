@@ -1,4 +1,5 @@
 import { getSessionUser } from "@/lib/auth";
+import { logEvent } from "@/lib/events";
 import { deleteDocument } from "@/lib/kb/ingest";
 import { listDocuments } from "@/lib/kb/store";
 
@@ -21,7 +22,8 @@ export async function DELETE(req: Request) {
   }
   const id = Number(new URL(req.url).searchParams.get("id"));
   if (!Number.isInteger(id)) return Response.json({ error: "Missing id." }, { status: 400 });
-  return deleteDocument(id)
-    ? Response.json({ ok: true })
-    : Response.json({ error: "Document not found." }, { status: 404 });
+  const doc = listDocuments().find((d) => d.id === id);
+  if (!doc || !deleteDocument(id)) return Response.json({ error: "Document not found." }, { status: 404 });
+  logEvent(user, "document_deleted", doc.filename);
+  return Response.json({ ok: true });
 }

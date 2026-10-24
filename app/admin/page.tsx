@@ -1,14 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeftIcon, RefreshCwIcon, Trash2Icon, UploadIcon } from "lucide-react";
+import { ArrowLeftIcon, KeyRoundIcon, PowerIcon, RefreshCwIcon, Trash2Icon, UploadIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BrandMark } from "@/components/brand-mark";
 import { Button } from "@/components/ui/button";
 import { BRAND } from "@/lib/brand";
 
 type Doc = { id: number; filename: string; department: string | null; pages: number; chunks: number; size: number };
-type User = { id: number; username: string; name: string; department: string; role: string };
+type User = { id: number; username: string; name: string; department: string; role: string; disabled: boolean };
+type Ev = { id: number; at: string; username: string | null; action: string; detail: string | null };
+type Counts = { chat: number; kb: number; file: number };
+type Stats = {
+  users: number; activeUsers: number; documents: number; passages: number; chatsSaved: number;
+  questionsToday: Counts; questionsWeek: Counts; notFoundWeek: number; failedLoginsWeek: number;
+};
+type Activity = { stats: Stats; notFound: Ev[]; activity: Ev[] };
 type Chat = { id: string; title: string; messageCount: number; updatedAt: string | null };
 type Audit = { userId: number; username: string; name: string; department: string; threads: Chat[] };
 type Msg = { role: string; text: string };
@@ -33,14 +40,18 @@ export default function AdminPage() {
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [department, setDepartment] = useState("");
+  const [activity, setActivity] = useState<Activity | null>(null);
+  const [form, setForm] = useState({ username: "", name: "", department: "", role: "user", password: "" });
 
   const load = useCallback(async () => {
     try {
-      const [d, u, a] = await Promise.all([
+      const [d, u, a, act] = await Promise.all([
         api<{ documents: Doc[] }>("/api/kb/documents"),
         api<{ users: User[] }>("/api/admin/users"),
         api<{ users: Audit[] }>("/api/admin/audit"),
+        api<Activity>("/api/admin/activity"),
       ]);
+      setActivity(act);
       setDocs(d.documents);
       setUsers(u.users);
       setAudit(a.users);
@@ -105,7 +116,26 @@ export default function AdminPage() {
     }
   };
 
+  const addUser = () =>
+    void run("Creating the account", async () => {
+      await api("/api/admin/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+      setForm({ username: "", name: "", department: "", role: "user", password: "" });
+      return `Account ${form.username} created.`;
+    });
+
+  const patchUser = (u: User, change: Record<string, unknown>, done: string) =>
+    void run("Saving", async () => {
+      await api("/api/admin/users", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: u.id, ...change }) });
+      return done;
+    });
+
+  const resetPassword = (u: User) => {
+    const password = window.prompt(`New password for ${u.username} (at least 8 characters):`);
+    if (password) patchUser(u, { password }, `Password for ${u.username} changed.`);
+  };
+
   const departments = [...new Set(users.map((u) => u.department))];
+  const field = "bg-background rounded-md border px-2 py-1.5 text-sm";
 
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-6 px-5 py-8">
@@ -124,6 +154,29 @@ export default function AdminPage() {
         <p role="status" className={`rounded-lg px-4 py-3 text-sm ${status.kind === "error" ? "bg-destructive/10 text-destructive" : "bg-muted"}`}>
           {status.text}
         </p>
+      )}
+
+      {activity && (
+        <section className={card}>
+          <h2 className="mb-4 font-medium">Usage</h2>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            {[
+              ["Questions today", activity.stats.questionsToday.chat + activity.stats.questionsToday.kb + activity.stats.questionsToday.file],
+              ["Questions, 7 days", activity.stats.questionsWeek.chat + activity.stats.questionsWeek.kb + activity.stats.questionsWeek.file],
+              ["From documents, 7 days", activity.stats.questionsWeek.kb],
+              ["Not found in documents, 7 days", activity.stats.notFoundWeek],
+              ["Active users", `${activity.stats.activeUsers} of ${activity.stats.users}`],
+              ["Documents", `${activity.stats.documents} (${activity.stats.passages} passages)`],
+              ["Saved chats", activity.stats.chatsSaved],
+              ["Failed sign-ins, 7 days", activity.stats.failedLoginsWeek],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-lg border px-4 py-3">
+                <p className="text-2xl font-semibold">{value}</p>
+                <p className="text-muted-foreground text-xs">{label}</p>
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
       <section className={card}>
@@ -184,18 +237,47 @@ export default function AdminPage() {
 
       <section className={card}>
         <h2 className="mb-4 font-medium">Users ({users.length})</h2>
-        <table className="w-full">
-          <thead>
-            <tr className="border-b"><th className={th}>Username</th><th className={th}>Name</th><th className={th}>Department</th><th className={th}>Role</th></tr>
-          </thead>
-          <tbody>
-            {users.map((u) => (
-              <tr key={u.id} className="border-b last:border-0">
-                <td className={td}>{u.username}</td><td className={td}>{u.name}</td><td className={td}>{u.department}</td><td className={td}>{u.role}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <input aria-label="Username" placeholder="username" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} className={`${field} w-32`} />
+          <input aria-label="Full name" placeholder="Full name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={`${field} w-40`} />
+          <input aria-label="Department" placeholder="Department" list="departments" value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} className={`${field} w-36`} />
+          <datalist id="departments">{departments.map((d) => <option key={d} value={d} />)}</datalist>
+          <select aria-label="Role" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className={field}>
+            <option value="user">User</option>
+            <option value="admin">Admin</option>
+          </select>
+          <input aria-label="Password" type="password" placeholder="Password (8+)" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className={`${field} w-36`} />
+          <Button size="sm" disabled={busy} onClick={addUser}>Create account</Button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b"><th className={th}>Username</th><th className={th}>Name</th><th className={th}>Department</th><th className={th}>Role</th><th className={th}>Status</th><th className={th} /></tr>
+            </thead>
+            <tbody>
+              {users.map((u) => (
+                <tr key={u.id} className="border-b last:border-0">
+                  <td className={td}>{u.username}</td><td className={td}>{u.name}</td><td className={td}>{u.department}</td>
+                  <td className={td}>
+                    <select aria-label={`Role of ${u.username}`} value={u.role} disabled={busy} onChange={(e) => patchUser(u, { role: e.target.value }, `${u.username} is now ${e.target.value}.`)} className={field}>
+                      <option value="user">User</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </td>
+                  <td className={td}>{u.disabled ? "Switched off" : "Active"}</td>
+                  <td className={`${td} flex gap-3`}>
+                    <button type="button" title="Set a new password" aria-label={`New password for ${u.username}`} disabled={busy} onClick={() => resetPassword(u)} className="text-muted-foreground hover:text-foreground">
+                      <KeyRoundIcon className="size-4" />
+                    </button>
+                    <button type="button" title={u.disabled ? "Switch on" : "Switch off"} aria-label={`${u.disabled ? "Switch on" : "Switch off"} ${u.username}`} disabled={busy} onClick={() => patchUser(u, { disabled: !u.disabled }, `${u.username} ${u.disabled ? "switched on" : "switched off"}.`)} className="text-muted-foreground hover:text-destructive">
+                      <PowerIcon className="size-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section className={card}>
@@ -235,6 +317,42 @@ export default function AdminPage() {
           )}
         </div>
       </section>
+
+      {activity && (
+        <section className={card}>
+          <h2 className="mb-1 font-medium">Questions the documents could not answer</h2>
+          <p className="text-muted-foreground mb-3 text-xs">Good hints for which documents to add next.</p>
+          {activity.notFound.length === 0 && <p className="text-muted-foreground text-sm">None yet.</p>}
+          <ul className="flex flex-col gap-1 text-sm">
+            {activity.notFound.map((e) => (
+              <li key={e.id} dir="auto" className="flex gap-3 border-b py-1.5 last:border-0">
+                <span className="text-muted-foreground shrink-0 text-xs">{e.at} · {e.username}</span>
+                <span>{e.detail}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {activity && (
+        <section className={card}>
+          <h2 className="mb-3 font-medium">Activity log</h2>
+          <div className="max-h-80 overflow-y-auto">
+            <table className="w-full">
+              <tbody>
+                {activity.activity.map((e) => (
+                  <tr key={e.id} className="border-b last:border-0">
+                    <td className={`${td} text-muted-foreground whitespace-nowrap text-xs`}>{e.at}</td>
+                    <td className={td}>{e.username ?? "-"}</td>
+                    <td className={td}>{e.action.replace(/_/g, " ")}</td>
+                    <td className={`${td} text-muted-foreground`}>{e.detail}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
     </main>
   );
 }
