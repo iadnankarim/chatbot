@@ -71,6 +71,7 @@ function db() {
     const cols = d.prepare("PRAGMA table_info(kb_chunks)").all() as unknown as { name: string }[];
     if (!cols.some((c) => c.name === "page_end")) d.exec("ALTER TABLE kb_chunks ADD COLUMN page_end INTEGER");
     if (!cols.some((c) => c.name === "page_map")) {
+      console.warn("[kb] schema upgrade: documents will be read again (run reindex)");
       d.exec("ALTER TABLE kb_chunks ADD COLUMN page_map TEXT");
       d.exec("DELETE FROM kb_documents");
     }
