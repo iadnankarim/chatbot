@@ -4,7 +4,7 @@ import { kvDelete, kvGet, kvSet } from "@/lib/kv";
 // Key-value storage for the logged-in user's chat threads and messages.
 // Every call is scoped to the user in the login cookie, never to a user id sent by the browser.
 
-const MAX_VALUE_BYTES = 5 * 1024 * 1024;
+const MAX_VALUE_BYTES = 20 * 1024 * 1024; // a message with an attached file carries the file
 // Keys are chosen by the chat library, e.g. plpa:formatted-messages:["<id>","<format>"].
 // They are only ever used as SQL parameters, so any printable ASCII is fine.
 const KEY_OK = /^plpa:[\x20-\x7E]{1,290}$/;

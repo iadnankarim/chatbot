@@ -13,6 +13,10 @@ export async function proxy(req: NextRequest) {
   if (session && onLoginPage) {
     return NextResponse.redirect(new URL("/", req.url));
   }
+  // Admin pages are for admins only (the admin APIs check the role again themselves).
+  if (session && req.nextUrl.pathname.startsWith("/admin") && session.role !== "admin") {
+    return NextResponse.redirect(new URL("/", req.url));
+  }
   return NextResponse.next();
 }
 

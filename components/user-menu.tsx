@@ -6,13 +6,14 @@ import {
   HelpCircleIcon,
   LogOutIcon,
   SettingsIcon,
+  ShieldIcon,
 } from "lucide-react";
 import { useEffect, useRef, useState, type FC } from "react";
 import { SettingsDialog } from "@/components/settings-dialog";
 import { FEATURES } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 
-type CurrentUser = { name: string; department: string; username: string };
+type CurrentUser = { name: string; department: string; username: string; role: string };
 
 const initials = (name: string) =>
   name
@@ -90,6 +91,16 @@ export const UserMenu: FC = () => {
               {user?.department ?? ""}
             </span>
           </span>
+          {user?.role === "admin" && (
+            <a
+              href="/admin"
+              title="Admin"
+              aria-label="Admin"
+              className="hover:bg-muted text-muted-foreground hover:text-foreground flex size-8 shrink-0 items-center justify-center rounded-md"
+            >
+              <ShieldIcon className="size-4" />
+            </a>
+          )}
           <button
             type="button"
             title="Log out"

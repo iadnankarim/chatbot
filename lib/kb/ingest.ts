@@ -82,3 +82,43 @@ export async function reindex(dir = docsDir(), force = false): Promise<IngestRep
   }
   return report;
 }
+
+// ---------------------------------------------------------------------------------------------
+// Admin helpers: adding and removing documents from the documents folder.
+
+const SAFE_DEPARTMENT = /^[\p{L}\p{N} _-]{1,40}$/u;
+
+/** A file name that cannot climb out of the documents folder or hide an odd extension. */
+export const safeFilename = (name: string) =>
+  path.basename(name).replace(/[^\p{L}\p{N} ._()-]/gu, "_");
+
+export class AdminError extends Error {}
+
+/** Saves an uploaded file into the documents folder (a department sub-folder when given). */
+export function saveDocument(filename: string, data: Buffer, department: string | null) {
+  const name = safeFilename(filename);
+  if (!/\.(pdf|docx)$/i.test(name)) throw new AdminError("Only PDF and Word (.docx) files can be added.");
+  if (department !== null && !SAFE_DEPARTMENT.test(department)) throw new AdminError("Invalid department name.");
+
+  const dir = department ? path.join(docsDir(), department) : docsDir();
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, name), data);
+  return name;
+}
+
+/** Removes a document from the index and deletes its file, so the next reindex does not bring it back. */
+export function deleteDocument(id: number) {
+  const doc = listDocuments().find((d) => d.id === id);
+  if (!doc) return false;
+  removeDocument(id);
+
+  const root = path.resolve(docsDir());
+  const file = path.resolve(root, doc.department ?? "", doc.filename);
+  if (file.startsWith(root + path.sep) && fs.existsSync(file)) {
+    fs.unlinkSync(file);
+    // Do not leave an empty department folder behind.
+    const dir = path.dirname(file);
+    if (dir !== root && fs.readdirSync(dir).length === 0) fs.rmdirSync(dir);
+  }
+  return true;
+}
